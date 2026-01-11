@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+
+    <!-- 기본은 HTTPS만 허용 -->
+    <base-config cleartextTrafficPermitted="false" />
+
+    <!-- 🔥 EC2 퍼블릭 IP만 HTTP 허용 -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">43.203.187.226</domain>
+    </domain-config>
+
+    <!-- (선택) 에뮬레이터 로컬 테스트 -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">10.0.2.2</domain>
+    </domain-config>
+
+</network-security-config>
