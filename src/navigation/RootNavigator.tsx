@@ -17,6 +17,7 @@ import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 
 /* Screens */
 import LoginScreen from '../screens/LoginScreen';
+import RegisterScreen from '../screens/RegisterScreen';
 
 /* Tab Stacks */
 import HomeStackNavigator from './HomeStackNavigator';
@@ -163,6 +164,10 @@ export default function RootNavigator() {
         component={LoginScreen}
         options={{ headerShown: false }}
       />
+
+      <Stack.Screen
+      name="Register"
+      component={RegisterScreen} />
 
       <Stack.Screen
         name="Main"

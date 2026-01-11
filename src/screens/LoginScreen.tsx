@@ -32,29 +32,46 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('입력 오류', '이메일과 비밀번호를 입력해주세요.');
-      return;
-    }
+const handleLogin = async () => {
+  if (!email || !password) {
+    Alert.alert('입력 오류', '이메일과 비밀번호를 입력해주세요.');
+    return;
+  }
 
-    try {
-      setLoading(true);
-      const { token, user } = await loginApi(email, password);
+  try {
+    setLoading(true);
+    const { token, user } = await loginApi(email, password);
 
-      await AsyncStorage.setItem('accessToken', token);
-      await AsyncStorage.setItem('user', JSON.stringify(user));
+    await AsyncStorage.setItem('accessToken', token);
+    await AsyncStorage.setItem('user', JSON.stringify(user));
 
-      navigation.replace('Main');
-    } catch (err: any) {
+    navigation.replace('Main');
+  } catch (err: any) {
+    const message = err?.response?.data?.message;
+
+    if (
+      message?.includes('존재하지') ||
+      message?.includes('not found')
+    ) {
       Alert.alert(
-        '로그인 실패',
-        err?.response?.data?.message ?? '서버 오류',
+        '계정을 찾을 수 없습니다',
+        '회원가입을 진행하시겠습니까?',
+        [
+          { text: '취소', style: 'cancel' },
+          {
+            text: '회원가입',
+            onPress: () => navigation.navigate('Register'),
+          },
+        ],
       );
-    } finally {
-      setLoading(false);
+    } else {
+      Alert.alert('로그인 실패', message ?? '서버 오류');
     }
-  };
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   return (
     <View style={styles.container}>
@@ -89,9 +106,18 @@ export default function LoginScreen() {
           {loading ? '로그인 중...' : '로그인'}
         </Text>
       </TouchableOpacity>
+
+          {/* 로그인 버튼 아래 추가 */}
+          <TouchableOpacity
+              style={styles.registerLink}
+              onPress={() => navigation.navigate('Register')}
+          >
+          <Text style={styles.registerText}>회원가입</Text>
+             </TouchableOpacity>
     </View>
   );
 }
+
 
 /* ================= 스타일 ================= */
 
@@ -142,4 +168,15 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
   },
+registerLink: {
+  marginTop: 20,
+  alignItems: 'center',
+},
+
+registerText: {
+  color: colors.primary,
+  fontSize: 14,
+  textDecorationLine: 'underline',
+  fontWeight: '600',
+}
 });
