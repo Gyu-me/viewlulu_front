@@ -24,7 +24,8 @@ import CosmeticDetectScreen from '../screens/CosmeticDetectScreen';
 import CosmeticDetectResultScreen from '../screens/CosmeticDetectResultScreen';
 import CosmeticDetailScreen from '../screens/CosmeticDetailScreen';
 
-/* ================= 타입 정의 ================= */
+/* ================= 타입 정의 =========
+======== */
 
 export type MyPouchStackParamList = {
   MyPouch: undefined;

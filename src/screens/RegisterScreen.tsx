@@ -1,9 +1,8 @@
 /**
- * RegisterScreen (회원가입)
+ * RegisterScreen (회원가입 최종본)
  * --------------------------------------------------
- * - 기본 회원 정보 입력
- * - 성별 Radio 선택
- * - 회원가입 API 요청
+ * - 이름 / 나이 / 성별 / 이메일 / 비밀번호 입력
+ * - 백엔드 회원가입 API 연동
  * - 성공 시 로그인 화면으로 이동
  */
 
@@ -21,6 +20,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { colors } from '../theme/colors';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+import { registerApi } from '../api/auth.api';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -40,25 +40,28 @@ export default function RegisterScreen() {
       return;
     }
 
+    if (password.length < 8) {
+      Alert.alert('비밀번호 오류', '비밀번호는 최소 8자 이상이어야 합니다.');
+      return;
+    }
+
     try {
       setLoading(true);
 
-      // 🔗 추후 서버 연동
-      /*
       await registerApi({
         name,
-        age: Number(age),
-        gender,
         email,
         password,
+        age: Number(age),
+        gender,
       });
-      */
 
       Alert.alert('회원가입 완료', '로그인 화면으로 이동합니다.', [
         { text: '확인', onPress: () => navigation.goBack() },
       ]);
-    } catch (e: any) {
-      Alert.alert('회원가입 실패', e?.response?.data?.message ?? '서버 오류');
+    } catch (err: any) {
+      const message = err?.response?.data?.message ?? '서버 오류';
+      Alert.alert('회원가입 실패', message);
     } finally {
       setLoading(false);
     }
@@ -68,16 +71,17 @@ export default function RegisterScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>회원가입</Text>
 
+      {/* 이름 (한글 입력 문제 해결 포인트) */}
       <TextInput
         style={styles.input}
         placeholder="이름"
         placeholderTextColor="#777"
         value={name}
         onChangeText={setName}
-        keyboardType="default"
         autoCorrect={false}
         autoCapitalize="none"
-        textContentType="none"
+        keyboardType="default"
+        textContentType="name"
       />
 
       <TextInput
@@ -125,7 +129,7 @@ export default function RegisterScreen() {
 
       <TextInput
         style={styles.input}
-        placeholder="비밀번호"
+        placeholder="비밀번호 (8자 이상)"
         placeholderTextColor="#777"
         value={password}
         onChangeText={setPassword}

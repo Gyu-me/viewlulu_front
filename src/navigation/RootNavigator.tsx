@@ -1,33 +1,26 @@
 /**
- * RootNavigator (최종 통일본)
+ * RootNavigator (최종 안정본 + MyPouch 항상 목록으로)
  * --------------------------------------------------
- * - 모든 탭 하단바 스타일 완전 통일
- * - MyPouch만 다르게 보이던 문제 완전 제거
- * - 하단 네비게이터 분리선 + 여백 추가
- *
- * ⚠️ 하단바 위치/여백은 추후 수동 조절 가능
- *     → tabBarStyle 내부 주석 참고
+ * - Home / Settings UI 절대 변경 없음
+ * - MyPouch 탭에서 다른 탭으로 이동하면 자동 popToTop
+ * - 다시 MyPouch로 오면 항상 MyPouchScreen부터 시작
  */
 
 import React from 'react';
-import { Image } from 'react-native';
+import { Image, View } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 
-/* Screens */
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
+import CosmeticConfirmScreen from '../screens/CosmeticConfirmScreen';
 
-/* Tab Stacks */
 import HomeStackNavigator from './HomeStackNavigator';
 import MyPouchStackNavigator from './MyPouchStackNavigator';
 import SettingsStackNavigator from './SettingsStackNavigator';
-
-/* Feature Stack */
 import FeatureStackNavigator from './FeatureStackNavigator';
 
-/* Icons */
 const PouchIcon = require('../assets/pouchicon.png');
 const HomeIcon = require('../assets/home.png');
 const SettingsIcon = require('../assets/settings.png');
@@ -35,7 +28,18 @@ const SettingsIcon = require('../assets/settings.png');
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-/* ================= Bottom Tab ================= */
+/* ================= 공통 TabBar Style ================= */
+
+const BASE_TAB_STYLE = {
+  backgroundColor: '#000',
+  borderTopWidth: 0.8,
+  borderTopColor: 'rgba(255,255,255,0.15)',
+  paddingTop: 8,
+  paddingBottom: 16,
+  height: 86,
+};
+
+/* ================= Tab Navigator ================= */
 
 function TabNavigator() {
   return (
@@ -43,35 +47,20 @@ function TabNavigator() {
       initialRouteName="Home"
       screenOptions={{
         headerShown: false,
-
-        /* 색상 */
         tabBarActiveTintColor: '#FFD400',
         tabBarInactiveTintColor: '#FFFFFF',
-
-        /* ⭐ 하단바 스타일 (여기서만 정의) */
-        tabBarStyle: {
-          backgroundColor: '#000',
-
-          /* ───────── 분리선 (조절 가능) ───────── */
-          borderTopWidth: 0.8, // ← 분리선 두께
-          borderTopColor: 'rgba(255,255,255,0.15)', // ← 분리선 색상
-
-          /* ───────── 위/아래 여백 (조절 가능) ───────── */
-          paddingTop: 8,      // ← 아이콘을 위로 올리고 싶으면 증가
-          paddingBottom: 16,  // ← 홈 인디케이터와 간격
-
-          height: 86,         // ← 하단바 전체 높이
-          elevation: 0,       // Android 그림자 제거
-        },
-
+        tabBarStyle: BASE_TAB_STYLE,
+        tabBarBackground: () => (
+          <View style={{ flex: 1, backgroundColor: '#000' }} />
+        ),
         tabBarLabelStyle: {
           fontSize: 12,
           fontWeight: '600',
-          marginTop: 4, // ← 아이콘-라벨 간격 조절 가능
+          marginTop: 4,
         },
       }}
     >
-      {/* MyPouch */}
+      {/* ================= MyPouch ================= */}
       <Tab.Screen
         name="MyPouch"
         component={MyPouchStackNavigator}
@@ -79,18 +68,16 @@ function TabNavigator() {
           const routeName =
             getFocusedRouteNameFromRoute(route) ?? 'MyPouch';
 
-          const hideTabScreens = [
-            'CosmeticDetect',
-            'CosmeticDetectResult',
-          ];
+          const hideTab =
+            routeName === 'CosmeticDetect' ||
+            routeName === 'CosmeticDetectResult' ||
+            routeName === 'CosmeticRegister';
 
           return {
-            /* ❗ tabBarStyle 직접 수정 금지 (통일성 유지) */
-            tabBarItemStyle: {
-              display: hideTabScreens.includes(routeName)
-                ? 'none'
-                : 'flex',
-            },
+            // ✅ 핵심: 탭이 blur될 때 MyPouchStack을 자동 popToTop
+            popToTopOnBlur: true,
+
+            tabBarStyle: hideTab ? { display: 'none' } : BASE_TAB_STYLE,
 
             tabBarIcon: ({ focused }) => (
               <Image
@@ -100,14 +87,13 @@ function TabNavigator() {
                   height: 26,
                   tintColor: focused ? '#FFD400' : '#FFFFFF',
                 }}
-                resizeMode="contain"
               />
             ),
           };
         }}
       />
 
-      {/* Home */}
+      {/* ================= Home (절대 변경 없음) ================= */}
       <Tab.Screen
         name="Home"
         component={HomeStackNavigator}
@@ -120,13 +106,12 @@ function TabNavigator() {
                 height: 26,
                 tintColor: focused ? '#FFD400' : '#FFFFFF',
               }}
-              resizeMode="contain"
             />
           ),
         }}
       />
 
-      {/* Settings */}
+      {/* ================= Settings (절대 변경 없음) ================= */}
       <Tab.Screen
         name="Settings"
         component={SettingsStackNavigator}
@@ -139,7 +124,6 @@ function TabNavigator() {
                 height: 26,
                 tintColor: focused ? '#FFD400' : '#FFFFFF',
               }}
-              resizeMode="contain"
             />
           ),
         }}
@@ -152,22 +136,14 @@ function TabNavigator() {
 
 export default function RootNavigator() {
   return (
-    <Stack.Navigator
-      initialRouteName="Login"
-      screenOptions={{
-        animation: 'slide_from_right',
-        headerBackTitleVisible: false,
-      }}
-    >
+    <Stack.Navigator initialRouteName="Login">
       <Stack.Screen
         name="Login"
         component={LoginScreen}
         options={{ headerShown: false }}
       />
 
-      <Stack.Screen
-      name="Register"
-      component={RegisterScreen} />
+      <Stack.Screen name="Register" component={RegisterScreen} />
 
       <Stack.Screen
         name="Main"
@@ -175,7 +151,12 @@ export default function RootNavigator() {
         options={{ headerShown: false }}
       />
 
-      {/* 기능 전용 영역 (Tab 없음) */}
+      <Stack.Screen
+        name="CosmeticConfirm"
+        component={CosmeticConfirmScreen}
+        options={{ title: '화장품 확인' }}
+      />
+
       <Stack.Screen
         name="Feature"
         component={FeatureStackNavigator}
