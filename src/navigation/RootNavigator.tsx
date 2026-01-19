@@ -83,7 +83,8 @@ function TabNavigator() {
           const hideTab =
             routeName === 'CosmeticDetect' ||
             routeName === 'CosmeticDetectResult' ||
-            routeName === 'CosmeticRegister';
+            routeName === 'CosmeticDetail' ||
+            routeName === 'CosmeticRegister'; //지울수도있음 ;;
 
           return {
             // ✅ 기존 기능 그대로 유지
@@ -178,11 +179,6 @@ export default function RootNavigator() {
         options={{ title: '화장품 확인' }}
       />
 
-      <Stack.Screen
-        name="Feature"
-        component={FeatureStackNavigator}
-        options={{ headerShown: false }}
-      />
     </Stack.Navigator>
   );
 }

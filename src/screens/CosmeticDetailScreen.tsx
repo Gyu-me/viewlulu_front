@@ -1,9 +1,9 @@
 /**
- * CosmeticDetailScreen (FINAL)
+ * CosmeticDetailScreen (FINAL + Detect UX 분기)
  * --------------------------------------------------
  * - GET /cosmetics/:id
  * - api.ts 사용 (Authorization 자동)
- * - URL / 토큰 / 에러 완전 통일
+ * - Detect 결과 진입 시 UX 분기 처리
  */
 
 import React, { useEffect, useState } from 'react';
@@ -18,9 +18,12 @@ import {
   Alert,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors } from '../theme/colors';
 import { api } from '../api/api';
+
+/* ================= Types ================= */
 
 type Photo = {
   s3Key: string;
@@ -35,13 +38,18 @@ type CosmeticDetail = {
 };
 
 type RouteParams = {
-  CosmeticDetail: { cosmeticId: number };
+  CosmeticDetail: {
+    cosmeticId: number;
+    fromDetect?: boolean; // ✅ Detect 진입 여부
+  };
 };
+
+/* ================= Component ================= */
 
 export default function CosmeticDetailScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<RouteParams, 'CosmeticDetail'>>();
-  const { cosmeticId } = route.params;
+  const { cosmeticId, fromDetect } = route.params;
 
   const [data, setData] = useState<CosmeticDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -90,51 +98,83 @@ export default function CosmeticDetailScreen() {
     );
   };
 
-  /* ================= Render ================= */
+   /* ================= Render ================= */
 
-  if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator color={colors.primary} size="large" />
-      </View>
-    );
-  }
+   if (loading) {
+     return (
+       <View style={styles.center}>
+         <ActivityIndicator color={colors.primary} size="large" />
+       </View>
+     );
+   }
 
-  if (error || !data) {
-    return (
-      <View style={styles.center}>
-        <Text style={styles.errorText}>
-          화장품 정보를 불러올 수 없습니다.
-        </Text>
-      </View>
-    );
-  }
+   if (error || !data) {
+     return (
+       <View style={styles.center}>
+         <Text style={styles.errorText}>
+           화장품 정보를 불러올 수 없습니다.
+         </Text>
+       </View>
+     );
+   }
 
-  return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.name}>{data.cosmeticName}</Text>
+   return (
+     <SafeAreaView
+       edges={['top', 'bottom']}
+       style={{ flex: 1, backgroundColor: '#000' }}
+     >
+       <ScrollView
+         contentContainerStyle={styles.scrollContent}
+         showsVerticalScrollIndicator={false}
+       >
+         <Text style={styles.name}>{data.cosmeticName}</Text>
 
-      <Text style={styles.date}>
-        등록일: {new Date(data.createdAt).toLocaleString()}
-      </Text>
+         <Text style={styles.date}>
+           등록일: {new Date(data.createdAt).toLocaleString()}
+         </Text>
 
-      {data.photos.map((p, idx) => {
-        const uri = p.url || p.s3Key;
-        return (
-          <Image
-            key={idx}
-            source={{ uri }}
-            style={styles.image}
-            resizeMode="cover"
-          />
-        );
-      })}
+         {data.photos.map((p, idx) => {
+           const uri = p.url || p.s3Key;
+           return (
+             <Image
+               key={idx}
+               source={{ uri }}
+               style={styles.image}
+               resizeMode="cover"
+             />
+           );
+         })}
 
-      <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
-        <Text style={styles.deleteText}>화장품 삭제하기</Text>
-      </TouchableOpacity>
-    </ScrollView>
-  );
+         {/* ================= 하단 액션 분기 ================= */}
+         {fromDetect ? (
+           <View style={styles.detectActions}>
+             <TouchableOpacity
+               style={styles.secondaryButton}
+               onPress={() => navigation.popToTop()}
+             >
+               <Text style={styles.secondaryText}>내 파우치로 가기</Text>
+             </TouchableOpacity>
+
+             <TouchableOpacity
+               style={styles.primaryButton}
+               onPress={() =>
+                 navigation.getParent()?.navigate('Home')
+               }
+             >
+               <Text style={styles.primaryText}>홈으로 가기</Text>
+             </TouchableOpacity>
+           </View>
+         ) : (
+           <TouchableOpacity
+             style={styles.deleteButton}
+             onPress={handleDelete}
+           >
+             <Text style={styles.deleteText}>화장품 삭제하기</Text>
+           </TouchableOpacity>
+         )}
+       </ScrollView>
+     </SafeAreaView>
+   );
 }
 
 /* ================= Styles ================= */
@@ -166,6 +206,43 @@ const styles = StyleSheet.create({
     backgroundColor: '#111',
   },
 
+  /* ===== Detect 전용 버튼 ===== */
+
+  detectActions: {
+    marginTop: 24,
+    gap: 12,
+    marginBottom: 40,
+  },
+
+  primaryButton: {
+    backgroundColor: colors.primary,
+    paddingVertical: 16,
+    borderRadius: 16,
+    alignItems: 'center',
+  },
+
+  primaryText: {
+    color: '#000',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+
+  secondaryButton: {
+    borderWidth: 2,
+    borderColor: colors.primary,
+    paddingVertical: 16,
+    borderRadius: 16,
+    alignItems: 'center',
+  },
+
+  secondaryText: {
+    color: colors.primary,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+
+  /* ===== 기존 삭제 버튼 (유지) ===== */
+
   deleteButton: {
     borderWidth: 2,
     borderColor: '#ff4d4f',
@@ -179,4 +256,9 @@ const styles = StyleSheet.create({
   deleteText: { color: '#ff4d4f', fontSize: 16, fontWeight: '700' },
 
   errorText: { color: '#ff6b6b', fontSize: 15 },
+
+  scrollContent: {
+    padding: 20,
+    paddingBottom: 48, // 🔥 하단 네비게이션/제스처바 여유
+  },
 });

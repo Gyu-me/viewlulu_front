@@ -102,9 +102,7 @@ export default function MyPouchScreen() {
 
   /* 🔥 화장품 등록 이동 */
   const goRegister = () => {
-    navigation.navigate('Feature', {
-      screen: 'CosmeticRegister',
-    });
+    navigation.navigate('CosmeticRegister');
   };
 
   /* 로딩 */

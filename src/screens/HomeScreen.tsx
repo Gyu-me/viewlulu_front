@@ -117,11 +117,12 @@ export default function HomeScreen() {
         <TouchableOpacity
           style={styles.fab}
           onPress={() =>
-            navigation.navigate('Feature', {
+            navigation.navigate('MyPouch', {
               screen: 'CosmeticDetect',
             })
           }
         >
+
           <Image source={CameraIcon} style={styles.fabIcon} />
         </TouchableOpacity>
       </View>

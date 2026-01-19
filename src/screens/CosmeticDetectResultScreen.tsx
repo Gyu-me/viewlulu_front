@@ -95,7 +95,9 @@ export default function CosmeticDetectResultScreen() {
 
         <TouchableOpacity
           style={styles.secondaryButton}
-          onPress={() => navigation.popToTop()}
+          onPress={() =>
+            navigation.getParent()?.navigate('Home')
+          }
         >
           <Text style={styles.secondaryText}>홈으로 돌아가기</Text>
         </TouchableOpacity>
@@ -122,7 +124,7 @@ export default function CosmeticDetectResultScreen() {
 
         <TouchableOpacity
           style={styles.secondaryButton}
-          onPress={() => navigation.popToTop()}
+          onPress={() => navigation.getParent()?.navigate('Home')}
         >
           <Text style={styles.secondaryText}>홈으로 돌아가기</Text>
         </TouchableOpacity>
@@ -156,7 +158,7 @@ export default function CosmeticDetectResultScreen() {
 
       <TouchableOpacity
         style={styles.secondaryButton}
-        onPress={() => navigation.popToTop()}
+        onPress={() => navigation.getParent()?.navigate('Home')}
       >
         <Text style={styles.secondaryText}>홈으로 돌아가기</Text>
       </TouchableOpacity>
