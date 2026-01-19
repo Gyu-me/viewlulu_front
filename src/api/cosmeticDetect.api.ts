@@ -27,8 +27,9 @@ import { API_BASE_URL } from '@env';
  * ========================= */
 
 export type DetectCosmeticResponse = {
-  detectedId: string;
-  bestDistance?: number;
+  detectedId: string | null;
+  score?: number | null;
+  matched?: boolean;
 };
 
 /* =========================
@@ -87,11 +88,20 @@ export const detectCosmeticApi = async (photo: {
    * -------------------------------------------------- */
   if (!res.ok) {
     const text = await res.text();
-    console.error('[detectCosmeticApi][HTTP ERROR]', text);
+    console.warn('[detectCosmeticApi][NOT_MATCHED]', text);
 
-    // ❗ 서버에서 message 내려주는 구조 유지
-    throw new Error('DETECT_FAILED');
+    // ✅ 404 = 인식 실패 (정상 흐름)
+    if (res.status === 404) {
+      return {
+        detectedId: '', // ❗ 의미적으로 "못 찾음"
+        bestDistance: JSON.parse(text)?.bestDistance,
+      };
+    }
+
+    // ❌ 진짜 오류만 throw
+    throw new Error('NETWORK_ERROR');
   }
+
 
   /* --------------------------------------------------
    * 5️⃣ 정상 응답 파싱

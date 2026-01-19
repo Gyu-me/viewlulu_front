@@ -97,7 +97,7 @@ export default function CosmeticDetectResultScreen() {
           style={styles.secondaryButton}
           onPress={() => navigation.popToTop()}
         >
-          <Text style={styles.secondaryText}>파우치로 돌아가기</Text>
+          <Text style={styles.secondaryText}>홈으로 돌아가기</Text>
         </TouchableOpacity>
       </View>
     );
@@ -124,7 +124,7 @@ export default function CosmeticDetectResultScreen() {
           style={styles.secondaryButton}
           onPress={() => navigation.popToTop()}
         >
-          <Text style={styles.secondaryText}>파우치로 돌아가기</Text>
+          <Text style={styles.secondaryText}>홈으로 돌아가기</Text>
         </TouchableOpacity>
       </View>
     );
@@ -158,7 +158,7 @@ export default function CosmeticDetectResultScreen() {
         style={styles.secondaryButton}
         onPress={() => navigation.popToTop()}
       >
-        <Text style={styles.secondaryText}>파우치로 돌아가기</Text>
+        <Text style={styles.secondaryText}>홈으로 돌아가기</Text>
       </TouchableOpacity>
     </View>
   );
@@ -172,6 +172,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+
   title: {
     color: colors.primary,
     fontSize: 26,
@@ -184,20 +185,35 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginBottom: 40,
   },
+
+  /* ===== Primary (그대로 유지) ===== */
   primaryButton: {
     backgroundColor: colors.primary,
     paddingVertical: 16,
     borderRadius: 14,
     alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 14,
   },
-  primaryText: { color: '#000', fontSize: 16, fontWeight: '700' },
+  primaryText: {
+    color: '#000',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+
+  /* ===== Secondary (🔥 여기만 변경) ===== */
   secondaryButton: {
+    backgroundColor: colors.primary, // 🔥 노란색 채움
     borderWidth: 2,
     borderColor: colors.primary,
     paddingVertical: 14,
     borderRadius: 14,
     alignItems: 'center',
   },
-  secondaryText: { color: colors.primary, fontSize: 14, fontWeight: '600' },
+  secondaryText: {
+    color: '#000', // 🔥 검정색 글자
+    fontSize: 14,
+    fontWeight: '600',
+  },
 });
+

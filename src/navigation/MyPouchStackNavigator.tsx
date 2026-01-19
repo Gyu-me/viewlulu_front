@@ -30,8 +30,13 @@ import CosmeticDetailScreen from '../screens/CosmeticDetailScreen';
 export type MyPouchStackParamList = {
   MyPouch: undefined;
   CosmeticDetect: undefined;
-  CosmeticDetectResult: { detectedId: string };
-  CosmeticDetail: { id: string };
+  CosmeticDetectResult: {
+    cosmeticId: string | null;
+    score?: number | null;
+  };
+  CosmeticDetail: {
+    cosmeticId: string;
+  };
 };
 
 const Stack = createNativeStackNavigator<MyPouchStackParamList>();
@@ -54,18 +59,6 @@ export default function MyPouchStackNavigator() {
         name="MyPouch"
         component={MyPouchScreen}
         options={{ headerShown: false }}
-      />
-
-      <Stack.Screen
-        name="CosmeticDetect"
-        component={CosmeticDetectScreen}
-        options={{ title: '화장품 인식' }}
-      />
-
-      <Stack.Screen
-        name="CosmeticDetectResult"
-        component={CosmeticDetectResultScreen}
-        options={{ title: '인식 결과' }}
       />
 
       <Stack.Screen
