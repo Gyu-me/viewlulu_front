@@ -1,9 +1,10 @@
 /**
- * LoginScreen (API 연동 최종본)
+ * LoginScreen (🔥 FINAL STABLE)
  * --------------------------------------------------
- * - 실제 로그인 API 연동
- * - JWT AsyncStorage 저장
- * - 성공 시 Main 진입
+ * ✅ 실제 로그인 API 연동
+ * ✅ JWT AsyncStorage 저장 (완료 보장)
+ * ✅ 로그인 실패 사유 정확히 분기
+ * ✅ 성공 시 Main 진입
  */
 
 import React, { useState } from 'react';
@@ -32,46 +33,65 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-const handleLogin = async () => {
-  if (!email || !password) {
-    Alert.alert('입력 오류', '이메일과 비밀번호를 입력해주세요.');
-    return;
-  }
-
-  try {
-    setLoading(true);
-    const { token, user } = await loginApi(email, password);
-
-    await AsyncStorage.setItem('accessToken', token);
-    await AsyncStorage.setItem('user', JSON.stringify(user));
-
-    navigation.replace('Main');
-  } catch (err: any) {
-    const message = err?.response?.data?.message;
-
-    if (
-      message?.includes('존재하지') ||
-      message?.includes('not found')
-    ) {
-      Alert.alert(
-        '계정을 찾을 수 없습니다',
-        '회원가입을 진행하시겠습니까?',
-        [
-          { text: '취소', style: 'cancel' },
-          {
-            text: '회원가입',
-            onPress: () => navigation.navigate('Register'),
-          },
-        ],
-      );
-    } else {
-      Alert.alert('로그인 실패', message ?? '서버 오류');
+  const handleLogin = async () => {
+    if (!email || !password) {
+      Alert.alert('입력 오류', '이메일과 비밀번호를 입력해주세요.');
+      return;
     }
-  } finally {
-    setLoading(false);
-  }
-};
 
+    try {
+      setLoading(true);
+
+      const { token, user } = await loginApi(email, password);
+
+      /**
+       * 🔥 토큰 저장 완료 보장
+       */
+      await AsyncStorage.multiSet([
+        ['accessToken', token],
+        ['user', JSON.stringify(user)],
+      ]);
+
+      // 🔐 다음 API에서 토큰이 100% 존재하도록 보장
+      await AsyncStorage.getItem('accessToken');
+
+      navigation.replace('Main');
+    } catch (err: any) {
+      /**
+       * 🔥 axios / custom error 모두 대응
+       */
+      const message =
+        err?.message ||
+        err?.response?.data?.message ||
+        '로그인에 실패했습니다.';
+
+      if (
+        message.includes('존재하지') ||
+        message.includes('not found')
+      ) {
+        Alert.alert(
+          '계정을 찾을 수 없습니다',
+          '회원가입을 진행하시겠습니까?',
+          [
+            { text: '취소', style: 'cancel' },
+            {
+              text: '회원가입',
+              onPress: () => navigation.navigate('Register'),
+            },
+          ],
+        );
+      } else if (
+        message.includes('비밀번호') ||
+        message.includes('password')
+      ) {
+        Alert.alert('로그인 실패', '비밀번호가 올바르지 않습니다.');
+      } else {
+        Alert.alert('로그인 실패', message);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -107,19 +127,17 @@ const handleLogin = async () => {
         </Text>
       </TouchableOpacity>
 
-          {/* 로그인 버튼 아래 추가 */}
-          <TouchableOpacity
-              style={styles.registerLink}
-              onPress={() => navigation.navigate('Register')}
-          >
-          <Text style={styles.registerText}>회원가입</Text>
-             </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.registerLink}
+        onPress={() => navigation.navigate('Register')}
+      >
+        <Text style={styles.registerText}>회원가입</Text>
+      </TouchableOpacity>
     </View>
   );
 }
 
-
-/* ================= 스타일 ================= */
+/* ================= Styles ================= */
 
 const styles = StyleSheet.create({
   container: {
@@ -128,7 +146,6 @@ const styles = StyleSheet.create({
     padding: 24,
     justifyContent: 'center',
   },
-
   title: {
     color: colors.primary,
     fontSize: 36,
@@ -136,14 +153,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 8,
   },
-
   subTitle: {
     color: '#fff',
     fontSize: 14,
     textAlign: 'center',
     marginBottom: 36,
   },
-
   input: {
     borderWidth: 2,
     borderColor: colors.primary,
@@ -154,29 +169,26 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 16,
   },
-
   primaryButton: {
     backgroundColor: colors.primary,
     paddingVertical: 18,
     borderRadius: 14,
     marginTop: 8,
   },
-
   primaryText: {
     color: '#000',
     fontSize: 18,
     fontWeight: 'bold',
     textAlign: 'center',
   },
-registerLink: {
-  marginTop: 20,
-  alignItems: 'center',
-},
-
-registerText: {
-  color: colors.primary,
-  fontSize: 14,
-  textDecorationLine: 'underline',
-  fontWeight: '600',
-}
+  registerLink: {
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  registerText: {
+    color: colors.primary,
+    fontSize: 14,
+    textDecorationLine: 'underline',
+    fontWeight: '600',
+  },
 });

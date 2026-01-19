@@ -86,7 +86,7 @@ export default function CosmeticConfirmScreen() {
         {
           text: '확인',
           onPress: () =>
-            navigation.replace('Main', { screen: 'MyPouch' }),
+            navigation.replace('Main', { screen: 'MyPouchStack' }),
         },
       ]);
     } catch (error: any) {

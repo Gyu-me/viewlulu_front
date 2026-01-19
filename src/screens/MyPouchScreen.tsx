@@ -68,7 +68,9 @@ export default function MyPouchScreen() {
       setLoading(true);
       setError(null);
 
+      console.log('📦 [MyPouch] fetchMyCosmetics 호출');
       const data = await getMyCosmeticsApi();
+      console.log('📦 MyPouch API data:', data);
 
       const normalized: MyPouchItem[] = data.map((item: any) => ({
         groupId: item.groupId,
@@ -77,6 +79,7 @@ export default function MyPouchScreen() {
         thumbnailUrl: item.thumbnailUrl ?? null,
       }));
 
+      console.log('📦 [MyPouch] normalized:', normalized);
       setItems(normalized);
     } catch {
       setError('화장품 목록을 불러오지 못했습니다.');

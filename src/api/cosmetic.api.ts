@@ -1,16 +1,15 @@
 /**
- * Cosmetic API (🔥 안정 최종본)
+ * cosmetic.api.ts (🔥 최종 확정본)
  * --------------------------------------------------
  * ✅ 기존 API 전부 유지
  * ✅ Detect는 Node API 경유
  * ✅ FormData 안전 처리
- * ❌ Python 서버 직접 호출 제거
+ * ❌ Content-Type 수동 지정 완전 제거
+ * ❌ axios 직접 사용 제거 (api.ts만 사용)
  */
 
 import { api } from './api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios from 'axios';
-import { API_BASE_URL } from '@env';
 
 /* ================= 공통 타입 ================= */
 
@@ -35,34 +34,24 @@ export const detectCosmeticApi = async (photo: {
     type: photo.type,
   } as any);
 
-  try {
-    const res = await api.post('/cosmetics/detect', formData, {
-      headers: {
-        'Content-Type': undefined as any, // boundary 자동
-      },
-      timeout: 30000,
-    });
+  const res = await api.post('/cosmetics/detect', formData);
 
-    if (!res.data?.detectedId) {
-      throw new Error('Detect failed: empty detectedId');
-    }
-
-    return {
-      detectedId: Number(res.data.detectedId),
-    };
-  } catch (err: any) {
-    console.error('[detectCosmeticApi]', err?.response?.data || err);
-    throw err;
+  if (!res.data?.detectedId) {
+    throw new Error('Detect failed: empty detectedId');
   }
+
+  return {
+    detectedId: Number(res.data.detectedId),
+  };
 };
 
-/* ================= 내 화장품 목록 ================= */
+/* ================= 내 화장품 목록 (MyPouch) ================= */
 
 export type CosmeticGroupItem = {
-  id: number;
-  name: string;
-  thumbnail: string;
-  created_at: string;
+  groupId: number;
+  cosmeticName: string;
+  thumbnailUrl: string | null;
+  createdAt: string;
 };
 
 export const getMyCosmeticsApi = async (): Promise<CosmeticGroupItem[]> => {
@@ -80,7 +69,6 @@ export type CosmeticDetail = {
     s3Key: string;
     originalName: string;
     mimeType: string;
-    url: string;
   }[];
 };
 
@@ -106,12 +94,7 @@ export const uploadCosmeticApi = async (photo: {
     type: photo.type,
   } as any);
 
-  const res = await api.post('/cosmetics', formData, {
-    headers: {
-      'Content-Type': undefined as any,
-    },
-  });
-
+  const res = await api.post('/cosmetics', formData);
   return res.data;
 };
 
@@ -141,7 +124,7 @@ export const createCosmeticApi = async ({
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
-      // ❗ Content-Type 절대 지정하지 말 것
+      // ❗ Content-Type 절대 지정 ❌
     },
     body: formData,
   });
@@ -149,7 +132,7 @@ export const createCosmeticApi = async ({
   if (!res.ok) {
     const text = await res.text();
     console.error('[createCosmeticApi] failed', res.status, text);
-    throw new Error('Upload failed');
+    throw new Error(text);
   }
 
   return res.json();

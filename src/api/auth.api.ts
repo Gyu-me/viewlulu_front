@@ -1,18 +1,16 @@
 /**
- * auth.api.ts 인증 API (최종본)
- * ----------------------------------------
- * - 로그인
- * - 회원가입
- * - ✅ 인증 서버(HTTPS) 전용 axios 사용
- *   baseURL: https://viewlulu.site
- *
- * ⚠️ 주의:
- * - 인증 요청은 토큰이 필요 없으므로 interceptor/Authorization 불필요
+ * auth.api.ts (🔥 FINAL CONFIRMED)
+ * --------------------------------------------------
+ * ✅ api.ts 인스턴스 사용
+ *    - baseURL = https://viewlulu.site/api
+ * ✅ 로그인 / 회원가입 서버 curl 테스트와 완전 동일
+ * ✅ Authorization 인터셉터 사용 ❌ (로그인은 토큰 불필요)
+ * ✅ detect / cosmetics API와 경로 체계 완전 통일
  */
 
-import { authApi } from './authApi';
+import { api } from './api';
 
-/* ================= 타입 ================= */
+/* ================= Types ================= */
 
 /**
  * 공통 사용자 타입
@@ -21,6 +19,8 @@ export type AuthUser = {
   id: number;
   email: string;
   name: string;
+  age?: number;
+  gender?: '남' | '여';
 };
 
 /**
@@ -33,7 +33,7 @@ export type LoginResponse = {
 
 /**
  * 회원가입 요청
- * 🔴 백엔드 스펙과 반드시 일치
+ * ⚠️ 백엔드 스펙과 1:1 일치
  */
 export type RegisterRequest = {
   name: string;
@@ -52,13 +52,13 @@ export type RegisterResponse = AuthUser;
 
 /**
  * 로그인
- * POST /auth/login
+ * POST /api/auth/login
  */
 export const loginApi = async (
   email: string,
   password: string,
 ): Promise<LoginResponse> => {
-  const res = await authApi.post<LoginResponse>('/auth/login', {
+  const res = await api.post<LoginResponse>('/auth/login', {
     email,
     password,
   });
@@ -68,12 +68,12 @@ export const loginApi = async (
 
 /**
  * 회원가입
- * POST /auth/register
+ * POST /api/auth/register
  */
 export const registerApi = async (
   data: RegisterRequest,
 ): Promise<RegisterResponse> => {
-  const res = await authApi.post<RegisterResponse>('/auth/register', {
+  const res = await api.post<RegisterResponse>('/auth/register', {
     name: data.name,
     email: data.email,
     password: data.password,

@@ -1,12 +1,9 @@
 /**
- * CosmeticDetailScreen (Hook 안전 + UI 통일 최종본)
+ * CosmeticDetailScreen (FINAL)
  * --------------------------------------------------
  * - GET /cosmetics/:id
- * - 블랙 배경
- * - 제품명: 노란색
- * - 등록일: 흰색
- * - 상단 네비게이터 back 버튼만 사용
- * - 하단 삭제 기능 추가
+ * - api.ts 사용 (Authorization 자동)
+ * - URL / 토큰 / 에러 완전 통일
  */
 
 import React, { useEffect, useState } from 'react';
@@ -20,20 +17,14 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios from 'axios';
-import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 
 import { colors } from '../theme/colors';
-
-const API_BASE_URL = 'https://api.viewlulu.site';
-const S3_BASE_URL = 'https://viewlulus3.s3.ap-northeast-2.amazonaws.com';
+import { api } from '../api/api';
 
 type Photo = {
   s3Key: string;
-  originalName: string;
-  mimeType: string;
-  url?: string; // ✅ 백엔드에서 추가로 내려주는 URL
+  url?: string;
 };
 
 type CosmeticDetail = {
@@ -47,15 +38,8 @@ type RouteParams = {
   CosmeticDetail: { cosmeticId: number };
 };
 
-const toImageUrl = (keyOrUrl?: string | null) => {
-  if (!keyOrUrl) return null;
-  if (/^https?:\/\//i.test(keyOrUrl)) return keyOrUrl;
-  const clean = keyOrUrl.replace(/^\//, '');
-  return `${S3_BASE_URL.replace(/\/$/, '')}/${encodeURI(clean)}`;
-};
-
 export default function CosmeticDetailScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<RouteParams, 'CosmeticDetail'>>();
   const { cosmeticId } = route.params;
 
@@ -63,16 +47,15 @@ export default function CosmeticDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
+  /* ================= Fetch ================= */
+
   useEffect(() => {
     const fetchDetail = async () => {
       try {
-        const token = await AsyncStorage.getItem('accessToken');
-        const res = await axios.get<CosmeticDetail>(
-          `${API_BASE_URL}/cosmetics/${cosmeticId}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        const res = await api.get(`/cosmetics/${cosmeticId}`);
         setData(res.data);
-      } catch {
+      } catch (e) {
+        console.error('[CosmeticDetailScreen] fetch error', e);
         setError(true);
       } finally {
         setLoading(false);
@@ -82,10 +65,12 @@ export default function CosmeticDetailScreen() {
     fetchDetail();
   }, [cosmeticId]);
 
+  /* ================= Delete ================= */
+
   const handleDelete = () => {
     Alert.alert(
       '삭제 확인',
-      '이 화장품을 삭제하시겠습니까?\n삭제 후에는 복구할 수 없습니다.',
+      '이 화장품을 삭제하시겠습니까?',
       [
         { text: '취소', style: 'cancel' },
         {
@@ -93,20 +78,19 @@ export default function CosmeticDetailScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              const token = await AsyncStorage.getItem('accessToken');
-              await axios.delete(`${API_BASE_URL}/cosmetics/${cosmeticId}`, {
-                headers: { Authorization: `Bearer ${token}` },
-              });
-              Alert.alert('삭제 완료', '화장품이 삭제되었습니다.');
+              await api.delete(`/cosmetics/${cosmeticId}`);
+              Alert.alert('삭제 완료');
               navigation.goBack();
             } catch {
-              Alert.alert('삭제 실패', '삭제 중 오류가 발생했습니다.');
+              Alert.alert('삭제 실패');
             }
           },
         },
       ]
     );
   };
+
+  /* ================= Render ================= */
 
   if (loading) {
     return (
@@ -120,7 +104,7 @@ export default function CosmeticDetailScreen() {
     return (
       <View style={styles.center}>
         <Text style={styles.errorText}>
-          화장품 정보를 불러오는 중 오류가 발생했습니다.
+          화장품 정보를 불러올 수 없습니다.
         </Text>
       </View>
     );
@@ -134,21 +118,14 @@ export default function CosmeticDetailScreen() {
         등록일: {new Date(data.createdAt).toLocaleString()}
       </Text>
 
-      {data.photos.map((photo, index) => {
-        const uri = toImageUrl(photo.url || photo.s3Key);
+      {data.photos.map((p, idx) => {
+        const uri = p.url || p.s3Key;
         return (
           <Image
-            key={`${data.cosmeticId}-${index}`}
-            source={uri ? { uri } : undefined}
+            key={idx}
+            source={{ uri }}
             style={styles.image}
-            onError={(e) => {
-              console.log(
-                '[CosmeticDetailScreen][image load error]',
-                data.cosmeticId,
-                uri,
-                e?.nativeEvent
-              );
-            }}
+            resizeMode="cover"
           />
         );
       })}
@@ -159,6 +136,8 @@ export default function CosmeticDetailScreen() {
     </ScrollView>
   );
 }
+
+/* ================= Styles ================= */
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 20, backgroundColor: '#000' },

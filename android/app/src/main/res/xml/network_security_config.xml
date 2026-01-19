@@ -1,24 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
 
-    <!-- ✅ 기본: cleartext 허용 (도메인 단위로 제한함) -->
+    <!-- 기본 설정 -->
     <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
             <certificates src="system" />
+            <certificates src="user" /> <!-- 🔥 추가 -->
         </trust-anchors>
     </base-config>
 
-    <!-- 🔥 viewlulu.site (HTTP + 모든 포트 허용) -->
+    <!-- viewlulu.site (HTTPS / HTTP 모두 허용) -->
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="true">viewlulu.site</domain>
     </domain-config>
 
-    <!-- 🔥 EC2 퍼블릭 IP 직접 접근 허용 -->
+    <!-- EC2 퍼블릭 IP 접근 -->
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="false">43.203.187.226</domain>
     </domain-config>
 
-    <!-- 🔥 Android 에뮬레이터 로컬 -->
+    <!-- Android Emulator -->
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="false">10.0.2.2</domain>
     </domain-config>
