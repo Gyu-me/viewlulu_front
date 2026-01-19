@@ -7,6 +7,7 @@
  * ✅ 성공 시 Main 진입
  */
 
+import { Image } from 'react-native';
 import React, { useState } from 'react';
 import {
   View,
@@ -23,6 +24,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors } from '../theme/colors';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { loginApi } from '../api/auth.api';
+import AppIcon from '../assets/ViewLuluAppIcon.png';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -95,8 +97,12 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.container}>
+      {/* 앱 아이콘 */}
+      <Image source={AppIcon} style={styles.appIcon} />
+
       <Text style={styles.title}>뷰루루</Text>
       <Text style={styles.subTitle}>시각장애인을 위한 뷰티 도우미</Text>
+
 
       <TextInput
         style={styles.input}
@@ -191,4 +197,12 @@ const styles = StyleSheet.create({
     textDecorationLine: 'underline',
     fontWeight: '600',
   },
+    appIcon: {
+      width: 120,
+      height: 120,
+      resizeMode: 'contain',
+      alignSelf: 'center',
+      marginBottom: 24,
+    },
+
 });
