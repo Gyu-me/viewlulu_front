@@ -1,15 +1,13 @@
 /**
- * MyPouchScreen (🔥 Hook 순서 안전 + 포커스 자동 갱신 최종본)
+ * MyPouchScreen (FINAL DEPLOY STABLE)
  * --------------------------------------------------
- * - GET /cosmetics/me
- * - 썸네일 / 화장품 이름 / 등록일 표시
- * - 하단 중앙 카메라 버튼 → CosmeticDetect 이동
+ * - 화장품 목록 조회
+ * - 상단: 화장품 등록 버튼
+ * - 하단 카메라 버튼 ❌ 제거
  *
- * ✅ 동작 보장
- * - 최초 진입 시 목록 로드
- * - 등록 / 수정 / 삭제 후 돌아올 때 자동 갱신
- *
- * ❗ 기존 UI / UX / 디자인 / 기능 변경 없음
+ * ✅ Hook 순서 안전
+ * ✅ 등록/수정/삭제 후 자동 갱신
+ * ✅ 기존 API / UX 유지
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
@@ -41,9 +39,9 @@ type MyPouchItem = {
   thumbnailUrl: string | null;
 };
 
+/* S3 썸네일 처리 */
 const S3_BASE_URL =
   'https://viewlulus3.s3.ap-northeast-2.amazonaws.com';
-const CameraIcon = require('../assets/cameraicon.png');
 
 const toImageUrl = (keyOrUrl?: string | null) => {
   if (!keyOrUrl) return null;
@@ -60,17 +58,13 @@ export default function MyPouchScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  /**
-   * 🔥 서버에서 목록 요청
-   */
+  /* 화장품 목록 요청 */
   const fetchMyCosmetics = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      console.log('📦 [MyPouch] fetchMyCosmetics 호출');
       const data = await getMyCosmeticsApi();
-      console.log('📦 MyPouch API data:', data);
 
       const normalized: MyPouchItem[] = data.map((item: any) => ({
         groupId: item.groupId,
@@ -79,7 +73,6 @@ export default function MyPouchScreen() {
         thumbnailUrl: item.thumbnailUrl ?? null,
       }));
 
-      console.log('📦 [MyPouch] normalized:', normalized);
       setItems(normalized);
     } catch {
       setError('화장품 목록을 불러오지 못했습니다.');
@@ -88,32 +81,33 @@ export default function MyPouchScreen() {
     }
   };
 
-  /**
-   * ✅ 최초 마운트 시 1회 실행
-   * ❗ 이 useEffect는 제거하면 안 됨 (Hook 순서 고정용)
-   */
+  /* 최초 1회 */
   useEffect(() => {
     fetchMyCosmetics();
   }, []);
 
-  /**
-   * ✅ 화면 포커스 시마다 자동 갱신
-   * - 등록 / 수정 / 삭제 후 복귀 시 실행
-   */
+  /* 포커스 복귀 시 자동 갱신 */
   useFocusEffect(
     useCallback(() => {
       fetchMyCosmetics();
     }, [])
   );
 
+  /* 상세 이동 */
   const goDetail = (groupId: number) => {
-    navigation.navigate('CosmeticDetail', { cosmeticId: groupId });
+    navigation.navigate('CosmeticDetail', {
+      cosmeticId: groupId,
+    });
   };
 
-  const goDetect = () => {
-    navigation.navigate('CosmeticDetect');
+  /* 🔥 화장품 등록 이동 */
+  const goRegister = () => {
+    navigation.navigate('Feature', {
+      screen: 'CosmeticRegister',
+    });
   };
 
+  /* 로딩 */
   if (loading) {
     return (
       <View style={styles.center}>
@@ -122,6 +116,7 @@ export default function MyPouchScreen() {
     );
   }
 
+  /* 에러 */
   if (error) {
     return (
       <View style={styles.center}>
@@ -132,12 +127,25 @@ export default function MyPouchScreen() {
 
   return (
     <View style={styles.container}>
+      {/* 타이틀 */}
       <Text style={styles.title}>내 파우치</Text>
 
+      {/* 🔥 상단 화장품 등록 버튼 */}
+      <TouchableOpacity
+        style={styles.primaryButton}
+        activeOpacity={0.9}
+        onPress={goRegister}
+      >
+        <Text style={styles.primaryButtonText}>
+          화장품 등록
+        </Text>
+      </TouchableOpacity>
+
+      {/* 목록 */}
       <FlatList
         data={items}
         keyExtractor={item => String(item.groupId)}
-        contentContainerStyle={{ paddingBottom: 140 }}
+        contentContainerStyle={{ paddingBottom: 40 }}
         renderItem={({ item }) => {
           const uri = toImageUrl(item.thumbnailUrl);
 
@@ -151,13 +159,18 @@ export default function MyPouchScreen() {
                   <Image source={{ uri }} style={styles.thumb} />
                 ) : (
                   <View style={styles.thumbFallback}>
-                    <Text style={styles.thumbFallbackText}>No Image</Text>
+                    <Text style={styles.thumbFallbackText}>
+                      No Image
+                    </Text>
                   </View>
                 )}
               </View>
 
               <View style={styles.cardInfo}>
-                <Text style={styles.cardTitle} numberOfLines={1}>
+                <Text
+                  style={styles.cardTitle}
+                  numberOfLines={1}
+                >
                   {item.cosmeticName}
                 </Text>
                 <Text style={styles.cardSub}>
@@ -169,32 +182,48 @@ export default function MyPouchScreen() {
           );
         }}
       />
-
-      <View style={styles.fabGlow}>
-        <TouchableOpacity style={styles.fab} onPress={goDetect}>
-          <Image source={CameraIcon} style={styles.fabIcon} />
-        </TouchableOpacity>
-      </View>
     </View>
   );
 }
 
+/* ================= Styles ================= */
 
 const styles = StyleSheet.create({
   container: {
-      flex: 1,
-      backgroundColor: '#0A0A0A',
-      paddingHorizontal: 20,
-      paddingTop: 48,
-    },
+    flex: 1,
+    backgroundColor: '#0A0A0A',
+    paddingHorizontal: 20,
+    paddingTop: 48,
+  },
 
   title: {
     color: colors.primary,
     fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 24,
+    fontWeight: '800',
+    marginBottom: 20,
   },
 
+  /* 🔥 등록 버튼 */
+  primaryButton: {
+    backgroundColor: colors.primary,
+    borderRadius: 18,
+    paddingVertical: 18,
+    alignItems: 'center',
+    marginBottom: 28,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  primaryButtonText: {
+    color: '#000',
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+
+  /* 카드 */
   card: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -212,8 +241,10 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginRight: 12,
   },
-  thumb: { width: '100%', height: '100%' },
-
+  thumb: {
+    width: '100%',
+    height: '100%',
+  },
   thumbFallback: {
     flex: 1,
     backgroundColor: '#111',
@@ -225,49 +256,26 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
 
-  cardInfo: { flex: 1 },
+  cardInfo: {
+    flex: 1,
+  },
   cardTitle: {
     color: colors.primary,
     fontSize: 18,
     fontWeight: '800',
     marginBottom: 6,
   },
-  cardSub: { color: '#ccc', fontSize: 14 },
+  cardSub: {
+    color: '#ccc',
+    fontSize: 14,
+  },
 
   center: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  errorText: { color: '#ff6b6b' },
-
-  fabGlow: {
-    position: 'absolute',
-    bottom: 36,
-    alignSelf: 'center',
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(255, 212, 0, 0.25)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  fab: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.55,
-    shadowRadius: 12,
-    elevation: 10,
-  },
-  fabIcon: {
-    width: 30,
-    height: 30,
-    resizeMode: 'contain',
+  errorText: {
+    color: '#ff6b6b',
   },
 });

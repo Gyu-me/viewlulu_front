@@ -1,29 +1,30 @@
 /**
- * HomeScreen (FIRST DEPLOYMENT STABLE)
+ * HomeScreen (FINAL)
  * --------------------------------------------------
- *  첫 배포용 최소 기능 구성
- *
- * [유지]
- * - 화장품 등록
- * - 화장품 인식
- * - 나의 파우치 요약
- *   · 전체 개수
- *   · 가장 오래된 화장품 등록일
- *   · 최근 추가된 화장품 이름
- *
- * [제외 - 주석처리함]
- * - 얼굴형 분석
- * - 최근 분석 결과
+ * - 홈 요약 화면
+ * - 하단 중앙: 화장품 인식(Detect) 버튼
+ * - 화장품 등록 버튼 ❌ (MyPouch로 이동됨)
  */
 
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Image,
+} from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { colors } from '../theme/colors';
 import { getMyCosmeticsApi } from '../api/cosmetic.api';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+
+import PackageIcon from '../assets/packageicon.png';
+import NestClockIcon from '../assets/nestclockicon.png';
+import AlertIcon from '../assets/alerticon.png';
+import CameraIcon from '../assets/cameraicon.png';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -36,24 +37,33 @@ export default function HomeScreen() {
   const navigation = useNavigation<Nav>();
 
   const [count, setCount] = useState(0);
-  const [latest, setLatest] = useState<string | null>(null);
-  const [oldest, setOldest] = useState<string | null>(null);
+  const [over12, setOver12] = useState(0);
+  const [over24, setOver24] = useState(0);
 
+  /* 요약 데이터 로딩 */
   useEffect(() => {
     const fetchSummary = async () => {
       try {
         const data: CosmeticItem[] = await getMyCosmeticsApi();
         if (data.length === 0) return;
 
-        const sorted = [...data].sort(
-          (a, b) =>
-            new Date(a.createdAt).getTime() -
-            new Date(b.createdAt).getTime()
-        );
+        const now = new Date();
+        let c12 = 0;
+        let c24 = 0;
+
+        data.forEach(item => {
+          const created = new Date(item.createdAt);
+          const diffMonths =
+            (now.getFullYear() - created.getFullYear()) * 12 +
+            (now.getMonth() - created.getMonth());
+
+          if (diffMonths >= 24) c24++;
+          else if (diffMonths >= 12) c12++;
+        });
 
         setCount(data.length);
-        setLatest(sorted[sorted.length - 1].cosmeticName);
-        setOldest(sorted[0].createdAt);
+        setOver12(c12);
+        setOver24(c24);
       } catch {}
     };
 
@@ -64,95 +74,82 @@ export default function HomeScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>ViewLulu</Text>
 
-      {/* 가이드 카드 */}
-      <View style={styles.guideCard}>
-        <Text style={styles.guideTitle}>
-          뷰루루를 통해 화장품을 등록하고,{'\n'}
-          관리하고, 자신을 가꿔보세요!
-        </Text>
-        <Text style={styles.guideDesc}>
-          얼굴형 체크를 통해{'\n'}
-          나에게 어울리는 화장법을 알아보세요
-        </Text>
-      </View>
-
-      {/* 기능 버튼 */}
-      <View style={styles.actionRow}>
-        <ActionButton
-          label="화장품 등록"
-          onPress={() =>
-            navigation.navigate('Feature', {
-              screen: 'CosmeticRegister',
-            })
-          }
-        />
-        {/* 주석처리
-        <ActionButton
-          label="얼굴형 분석"
-          onPress={() =>
-            navigation.navigate('Feature', {
-              screen: 'FaceAnalysis',
-            })
-          }
-        />
-         */}
-      </View>
-
-      {/* 최근 분석 결과 */}
-      {/* 주석처리 <TouchableOpacity
-        style={styles.recentCard}
-        activeOpacity={0.85}
-        onPress={() =>
-          navigation.navigate('Feature', {
-            screen: 'RecentResult',
-          })
-        }
-      >
-        <Text style={styles.recentTitle}>최근 분석 결과</Text>
-        <Text style={styles.recentLink}>탭하여 자세히 보기 →</Text>
-      </TouchableOpacity>*/}
-
-      {/* 오늘의 파우치 */}
-      <View style={styles.summaryCard}>
-        <Text style={styles.summaryTitle}>오늘의 파우치</Text>
-
-        {count === 0 ? (
-          <Text style={styles.summaryEmpty}>
-            아직 등록된 화장품이 없어요
+      {/* HERO */}
+      <View style={styles.heroCard}>
+        <View style={styles.heroOverlay} />
+        <View style={styles.heroContent}>
+          <Text style={styles.heroTitle}>내 화장품을 한 곳에</Text>
+          <Text style={styles.heroDesc}>
+            유통기한과 개봉일을 관리하고{'\n'}
+            안전하게 사용하세요
           </Text>
-        ) : (
-          <>
-            <Text style={styles.summaryText}>
-              등록된 화장품 {count}개
-            </Text>
-            <Text style={styles.summarySub}>
-              최근 등록: {latest}
-            </Text>
-            <Text style={styles.summarySub}>
-              가장 오래된 등록일:{' '}
-              {oldest && new Date(oldest).toLocaleDateString()}
-            </Text>
-          </>
-        )}
+        </View>
+      </View>
+
+      {/* 파우치 요약 */}
+      <View style={styles.summaryCard}>
+        <Text style={styles.summaryTitle}>내 파우치</Text>
+
+        <View style={styles.summaryRow}>
+          <SummaryItem
+            label="전체"
+            value={count}
+            icon={PackageIcon}
+            iconColor={colors.primary}
+          />
+          <SummaryItem
+            label="12개월"
+            value={over12}
+            icon={NestClockIcon}
+            iconColor="#FF9F0A"
+          />
+          <SummaryItem
+            label="24개월"
+            value={over24}
+            icon={AlertIcon}
+            iconColor="#FF453A"
+          />
+        </View>
+      </View>
+
+      {/* 🔥 홈 하단 – 화장품 인식 버튼 */}
+      <View style={styles.fabGlow}>
+        <TouchableOpacity
+          style={styles.fab}
+          onPress={() =>
+            navigation.navigate('Feature', {
+              screen: 'CosmeticDetect',
+            })
+          }
+        >
+          <Image source={CameraIcon} style={styles.fabIcon} />
+        </TouchableOpacity>
       </View>
     </View>
   );
 }
 
-/* 버튼 */
-const ActionButton = ({
+/* 요약 아이템 */
+const SummaryItem = ({
   label,
-  onPress,
+  value,
+  icon,
+  iconColor,
 }: {
   label: string;
-  onPress: () => void;
+  value: number;
+  icon: any;
+  iconColor: string;
 }) => (
-  <TouchableOpacity style={styles.actionButton} onPress={onPress}>
-    <Text style={styles.actionText}>{label}</Text>
-  </TouchableOpacity>
+  <View style={styles.summaryItem}>
+    <Image
+      source={icon}
+      style={[styles.summaryIcon, { tintColor: iconColor }]}
+    />
+    <Text style={styles.summaryValue}>{value}</Text>
+    <Text style={styles.summaryLabel}>{label}</Text>
+  </View>
 );
-
-/* ================= 스타일 ================= */
 
 const styles = StyleSheet.create({
   container: {
@@ -161,129 +158,98 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 48,
   },
-
   title: {
     color: colors.primary,
     fontSize: 28,
-    fontWeight: 'bold',
+    fontWeight: '800',
     marginBottom: 24,
   },
 
-  guideCard: {
-    backgroundColor: '#1C1C1E',
-    borderRadius: 20,
-    padding: 24,
+  heroCard: {
+    height: 220,
+    borderRadius: 28,
+    backgroundColor: '#1A1A1A',
     marginBottom: 24,
-    borderWidth: 1,
-    borderColor: '#2C2C2E',
-    shadowColor: '#FFD60A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 8,
+    overflow: 'hidden',
   },
-  guideTitle: {
-    color: '#FFFFFF',
-    fontSize: 17,
-    fontWeight: '700',
-    lineHeight: 24,
-    marginBottom: 12,
-    letterSpacing: -0.3,
+  heroOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.45)',
   },
-  guideDesc: {
-    color: '#A0A0A0',
-    fontSize: 14,
-    lineHeight: 20,
-    letterSpacing: -0.2,
-  },
-
-  actionRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 24,
-    gap: 12,
-  },
-  actionButton: {
-    backgroundColor: '#FFD60A',
-    borderRadius: 16,
-    paddingVertical: 18,
+  heroContent: {
     flex: 1,
-    alignItems: 'center',
-    shadowColor: '#FFD60A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    justifyContent: 'flex-end',
+    padding: 24,
   },
-  actionText: {
-    color: '#000000',
-    fontWeight: '700',
-    fontSize: 15,
-    letterSpacing: -0.3,
+  heroTitle: {
+    color: '#FFF',
+    fontSize: 24,
+    fontWeight: '800',
   },
-
-  recentCard: {
-    backgroundColor: '#1C1C1E',
-    borderRadius: 18,
-    padding: 20,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: '#2C2C2E',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  recentTitle: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
-    letterSpacing: -0.3,
-  },
-  recentLink: {
-    color: '#FFD60A',
-    fontSize: 13,
-    textAlign: 'right',
-    fontWeight: '500',
+  heroDesc: {
+    color: 'rgba(255,255,255,0.75)',
+    marginTop: 8,
   },
 
   summaryCard: {
-    backgroundColor: '#1C1C1E',
-    borderRadius: 20,
-    padding: 22,
-    borderWidth: 1,
-    borderColor: '#2C2C2E',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    backgroundColor: '#1E1E1E',
+    borderRadius: 28,
+    padding: 24,
   },
   summaryTitle: {
-    color: '#FFD60A',
-    fontSize: 16,
+    color: '#FFF',
+    fontSize: 20,
     fontWeight: '700',
-    marginBottom: 14,
-    letterSpacing: -0.3,
+    marginBottom: 16,
   },
-  summaryText: {
-    color: '#FFFFFF',
-    fontSize: 16,
+  summaryRow: {
+    flexDirection: 'row',
+  },
+  summaryItem: {
+    flex: 1,
+    backgroundColor: '#2A2A2A',
+    borderRadius: 20,
+    paddingVertical: 18,
+    alignItems: 'center',
+    marginHorizontal: 4,
+  },
+  summaryIcon: {
+    width: 26,
+    height: 26,
     marginBottom: 8,
-    fontWeight: '600',
-    letterSpacing: -0.2,
   },
-  summarySub: {
-    color: '#8E8E93',
-    fontSize: 13,
-    marginBottom: 4,
-    letterSpacing: -0.1,
+  summaryValue: {
+    color: '#FFF',
+    fontSize: 22,
+    fontWeight: '800',
   },
-  summaryEmpty: {
-    color: '#8E8E93',
-    fontSize: 14,
-    letterSpacing: -0.2,
+  summaryLabel: {
+    color: 'rgba(255,255,255,0.5)',
+    marginTop: 4,
+  },
+
+  fabGlow: {
+    position: 'absolute',
+    bottom: 36,
+    alignSelf: 'center',
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255,212,0,0.25)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fab: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fabIcon: {
+    width: 30,
+    height: 30,
+    resizeMode: 'contain',
   },
 });

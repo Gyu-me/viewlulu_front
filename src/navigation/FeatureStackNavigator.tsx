@@ -18,6 +18,7 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
+import CosmeticDetectScreen from '../screens/CosmeticDetectScreen';
 import FaceAnalysisScreen from '../screens/FaceAnalysisScreen';
 import FaceResultScreen from '../screens/FaceResultScreen';
 import SkinAnalysisScreen from '../screens/SkinAnalysisScreen';
@@ -35,6 +36,12 @@ export default function FeatureStackNavigator() {
         headerBackTitleVisible: false,
       }}
     >
+      <Stack.Screen
+              name="CosmeticDetect"
+              component={CosmeticDetectScreen}
+              options={{ title: '화장품 인식' }}
+      />
+
       <Stack.Screen
         name="FaceAnalysis"
         component={FaceAnalysisScreen}
