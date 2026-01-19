@@ -1,10 +1,19 @@
 /**
- * HomeScreen (UI 개선 버전)
+ * HomeScreen (FIRST DEPLOYMENT STABLE)
  * --------------------------------------------------
- * - 부드러운 그라데이션과 그림자 효과
- * - 노란색을 포인트 컬러로만 사용
- * - 다크 모드 기반의 세련된 배색
- * - 카드별 깊이감 차별화
+ *  첫 배포용 최소 기능 구성
+ *
+ * [유지]
+ * - 화장품 등록
+ * - 화장품 인식
+ * - 나의 파우치 요약
+ *   · 전체 개수
+ *   · 가장 오래된 화장품 등록일
+ *   · 최근 추가된 화장품 이름
+ *
+ * [제외 - 주석처리함]
+ * - 얼굴형 분석
+ * - 최근 분석 결과
  */
 
 import React, { useEffect, useState } from 'react';
@@ -53,7 +62,7 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>홈</Text>
+      <Text style={styles.title}>ViewLulu</Text>
 
       {/* 가이드 카드 */}
       <View style={styles.guideCard}>
@@ -77,6 +86,7 @@ export default function HomeScreen() {
             })
           }
         />
+        {/* 주석처리
         <ActionButton
           label="얼굴형 분석"
           onPress={() =>
@@ -85,10 +95,11 @@ export default function HomeScreen() {
             })
           }
         />
+         */}
       </View>
 
       {/* 최근 분석 결과 */}
-      <TouchableOpacity
+      {/* 주석처리 <TouchableOpacity
         style={styles.recentCard}
         activeOpacity={0.85}
         onPress={() =>
@@ -99,7 +110,7 @@ export default function HomeScreen() {
       >
         <Text style={styles.recentTitle}>최근 분석 결과</Text>
         <Text style={styles.recentLink}>탭하여 자세히 보기 →</Text>
-      </TouchableOpacity>
+      </TouchableOpacity>*/}
 
       {/* 오늘의 파우치 */}
       <View style={styles.summaryCard}>
@@ -147,16 +158,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0A0A0A',
-    padding: 20,
-    paddingTop: 28,
+    paddingHorizontal: 20,
+    paddingTop: 48,
   },
 
   title: {
-    color: '#FFFFFF',
+    color: colors.primary,
     fontSize: 28,
-    fontWeight: '700',
-    marginBottom: 20,
-    letterSpacing: -0.5,
+    fontWeight: 'bold',
+    marginBottom: 24,
   },
 
   guideCard: {

@@ -42,9 +42,13 @@ export default function MyPouchStackNavigator() {
   return (
     <Stack.Navigator
       screenOptions={{
-        animation: 'slide_from_right',
-        headerBackTitleVisible: false,
-      }}
+          animation: 'slide_from_right',
+          headerBackTitleVisible: false,
+
+          contentStyle: {
+            backgroundColor: '#0A0A0A',
+          },
+        }}
     >
       <Stack.Screen
         name="MyPouch"

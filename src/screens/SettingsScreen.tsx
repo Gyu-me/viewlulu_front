@@ -101,15 +101,13 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: '#000',
-  },
+      flex: 1,
+      backgroundColor: '#0A0A0A',
+      paddingHorizontal: 20,
+      paddingTop: 48,
+    },
 
-  /* 🔥 MyPouchScreen과 완전 동일 */
-  content: {
-    padding: 20,
-    paddingTop: 28,
-  },
+
 
   title: {
     color: colors.primary,

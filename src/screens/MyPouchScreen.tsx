@@ -182,15 +182,17 @@ export default function MyPouchScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: '#000',
-    padding: 20,
-  },
+      flex: 1,
+      backgroundColor: '#0A0A0A',
+      paddingHorizontal: 20,
+      paddingTop: 48,
+    },
+
   title: {
     color: colors.primary,
-    fontSize: 26,
-    fontWeight: '800',
-    marginBottom: 20,
+    fontSize: 28,
+    fontWeight: 'bold',
+    marginBottom: 24,
   },
 
   card: {
