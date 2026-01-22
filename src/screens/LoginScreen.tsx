@@ -56,7 +56,19 @@ export default function LoginScreen() {
       // 저장 확인 (디버그용)
       await AsyncStorage.getItem('accessToken');
 
-      navigation.replace('Main');
+      navigation.reset({
+        index: 0,
+        routes: [
+          {
+            name: 'MainTabs',
+            state: {
+              index: 0,
+              routes: [{ name: 'HomeTab' }],
+            },
+          },
+        ],
+      });
+
     } catch (err: any) {
       const message =
         err?.response?.data?.message ||

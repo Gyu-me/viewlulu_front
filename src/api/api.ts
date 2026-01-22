@@ -21,6 +21,9 @@ if (!API_BASE_URL) {
   throw new Error('[api] API_BASE_URL is undefined. Check .env & babel config.');
 }
 
+
+
+
 /* ================= Axios Instance ================= */
 
 export const api = axios.create({
@@ -47,13 +50,7 @@ api.interceptors.request.use(
       url.includes('/auth/register') ||
       url.includes('/auth/refresh');
 
-    // 🔥 로그인 / 회원가입 / refresh → Authorization 절대 금지
-    if (isAuthRequest) {
-      if (config.headers?.Authorization) {
-        delete config.headers.Authorization;
-      }
-    } else {
-      // 🔥 나머지 API → accessToken 자동 주입
+    if (!isAuthRequest) {
       const token = await AsyncStorage.getItem('accessToken');
       if (token) {
         config.headers = config.headers ?? {};
@@ -61,8 +58,13 @@ api.interceptors.request.use(
       }
     }
 
-    // ✅ multipart/form-data일 경우 Content-Type 제거
-    if (config.data instanceof FormData) {
+    // 🔥 RN 안전 FormData 판별
+    const isFormData =
+      typeof config.data === 'object' &&
+      config.data !== null &&
+      typeof (config.data as any).append === 'function';
+
+    if (isFormData) {
       delete config.headers?.['Content-Type'];
     }
 
@@ -70,6 +72,7 @@ api.interceptors.request.use(
   },
   error => Promise.reject(error),
 );
+
 
 /* ================= Response Interceptor ================= */
 
@@ -95,7 +98,6 @@ api.interceptors.response.use(
   async error => {
     const originalRequest = error.config;
 
-    // ❌ accessToken 만료가 아니면 그대로 throw
     if (
       error.response?.status !== 401 ||
       originalRequest._retry
@@ -103,7 +105,6 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    // 🔁 refresh 중이면 대기열에 넣기
     if (isRefreshing) {
       return new Promise((resolve, reject) => {
         failedQueue.push({
@@ -125,7 +126,6 @@ api.interceptors.response.use(
         throw new Error('NO_REFRESH_TOKEN');
       }
 
-      // 🔄 refresh API 호출
       const res = await axios.post(
         `${API_BASE_URL}/auth/refresh`,
         { refreshToken },
@@ -133,23 +133,28 @@ api.interceptors.response.use(
 
       const newAccessToken = res.data.accessToken;
 
-      // ✅ 새 accessToken 저장
       await AsyncStorage.setItem('accessToken', newAccessToken);
 
-      // ✅ 대기 요청들 재시도
       processQueue(null, newAccessToken);
 
       originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
       return api(originalRequest);
-    } catch (refreshError) {
+    } catch (refreshError: any) {
       processQueue(refreshError, null);
 
-      // ❗ 여기서만 로그아웃 처리 (refreshToken도 invalid)
-      await AsyncStorage.multiRemove([
-        'accessToken',
-        'refreshToken',
-        'user',
-      ]);
+      /**
+       * 🔥 여기만 변경
+       * - refreshToken이 "명확히 invalid"일 때만 로그아웃
+       */
+      const status = refreshError?.response?.status;
+
+      if (status === 401 || status === 403) {
+        await AsyncStorage.multiRemove([
+          'accessToken',
+          'refreshToken',
+          'user',
+        ]);
+      }
 
       return Promise.reject(refreshError);
     } finally {
@@ -157,3 +162,4 @@ api.interceptors.response.use(
     }
   },
 );
+

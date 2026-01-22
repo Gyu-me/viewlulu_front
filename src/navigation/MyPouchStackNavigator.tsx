@@ -1,36 +1,41 @@
 /**
- * MyPouchStackNavigator (최종 기준본)
+ * MyPouchStackNavigator (FINAL - CaptureStack 분리 기준)
  * --------------------------------------------------
- * ✅ 화장품 인식 플로우 완결
- * ✅ Stack 내부 이동만 허용
+ * ✅ MyPouch 관련 화면만 유지
+ * ❌ 촬영/등록/인식 플로우 전부 제거
+ * ✅ DetectResult / Detail 에서 탭바 숨김
  */
 
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 
 import MyPouchScreen from '../screens/MyPouchScreen';
-import CosmeticDetectScreen from '../screens/CosmeticDetectScreen';
-import CosmeticDetectResultScreen from '../screens/CosmeticDetectResultScreen';
 import CosmeticDetailScreen from '../screens/CosmeticDetailScreen';
-import CosmeticRegisterScreen from '../screens/CosmeticRegisterScreen';
-import CosmeticConfirmScreen from '../screens/CosmeticConfirmScreen';
-
 
 export type MyPouchStackParamList = {
   MyPouch: undefined;
-  CosmeticDetect: undefined;
-  CosmeticDetectResult: {
-    cosmeticId: string | null;
-    score?: number | null;
-  };
   CosmeticDetail: {
     cosmeticId: string;
+    fromDetect?: boolean;
   };
 };
 
 const Stack = createNativeStackNavigator<MyPouchStackParamList>();
 
-export default function MyPouchStackNavigator() {
+export default function MyPouchStackNavigator({ navigation, route }: any) {
+  React.useLayoutEffect(() => {
+    const routeName =
+      getFocusedRouteNameFromRoute(route) ?? 'MyPouch';
+
+    const hideTab =
+      routeName === 'CosmeticDetail';
+
+    navigation.getParent()?.setOptions({
+      tabBarStyle: hideTab ? { display: 'none' } : undefined,
+    });
+  }, [navigation, route]);
+
   return (
     <Stack.Navigator
       screenOptions={{
@@ -46,35 +51,11 @@ export default function MyPouchStackNavigator() {
       />
 
       <Stack.Screen
-        name="CosmeticDetect"
-        component={CosmeticDetectScreen}
-        options={{ title: '화장품 인식' }}
-      />
-
-      <Stack.Screen
-        name="CosmeticDetectResult"
-        component={CosmeticDetectResultScreen}
-        options={{ title: '인식 결과' }}
-      />
-
-      <Stack.Screen
         name="CosmeticDetail"
         component={CosmeticDetailScreen}
-        options={{ title: '화장품 정보' }}
+        options={{ headerShown: false }}
       />
-
-      <Stack.Screen
-        name="CosmeticRegister"
-        component={CosmeticRegisterScreen}
-        options={{ title: '화장품 등록' }}
-      />
-
-      <Stack.Screen
-        name="CosmeticConfirm"
-        component={CosmeticConfirmScreen}
-        options={{ title: '화장품 확인' }}
-      />
-
     </Stack.Navigator>
   );
 }
+

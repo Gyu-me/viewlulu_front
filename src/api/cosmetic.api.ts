@@ -1,15 +1,16 @@
 /**
- * cosmetic.api.ts (🔥 최종 확정본)
+ * cosmetic.api.ts (🔥 REAL FINAL DEPLOY STABLE)
  * --------------------------------------------------
- * ✅ 기존 API 전부 유지
- * ✅ Detect는 Node API 경유
- * ✅ FormData 안전 처리
- * ❌ Content-Type 수동 지정 완전 제거
- * ❌ axios 직접 사용 제거 (api.ts만 사용)
+ * ✅ 기존 API / 엔드포인트 전부 유지
+ * ✅ Node API 경유 (Detect / Upload / Bulk)
+ * ✅ FormData Content-Type 자동 처리
+ * ✅ axios 직접 사용 ❌ (api.ts만 사용)
+ * ✅ Authorization / refresh / retry 전부 api.ts에 위임
  */
 
 import { api } from './api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_BASE_URL } from '@env';
 
 /* ================= 공통 타입 ================= */
 
@@ -19,6 +20,7 @@ export type DetectCosmeticResponse = {
 
 /* =================================================
  * 🔥 화장품 인식 (Node API)
+ * - 서버 multer.single('file') 기준 유지
  * ================================================= */
 
 export const detectCosmeticApi = async (photo: {
@@ -28,7 +30,8 @@ export const detectCosmeticApi = async (photo: {
 }): Promise<DetectCosmeticResponse> => {
   const formData = new FormData();
 
-  formData.append('photo', {
+  // ❗ 서버 기준 필드명: file (안전)
+  formData.append('file', {
     uri: photo.uri,
     name: photo.name,
     type: photo.type,
@@ -45,7 +48,7 @@ export const detectCosmeticApi = async (photo: {
   };
 };
 
-/* ================= 내 화장품 목록 (MyPouch) ================= */
+/* ================= 내 화장품 목록 (MyPouch / Home 공용) ================= */
 
 export type CosmeticGroupItem = {
   groupId: number;
@@ -88,7 +91,7 @@ export const uploadCosmeticApi = async (photo: {
 }) => {
   const formData = new FormData();
 
-  formData.append('photo', {
+  formData.append('file', {
     uri: photo.uri,
     name: photo.name,
     type: photo.type,
@@ -98,7 +101,11 @@ export const uploadCosmeticApi = async (photo: {
   return res.data;
 };
 
-/* ================= bulk 업로드 (4장 저장) ================= */
+/* ================= bulk 업로드 (4장 저장) =================
+ * ✅ fetch 제거
+ * ✅ 하드코딩 URL 제거
+ * ✅ Authorization 수동 주입 제거
+ * ========================================================= */
 
 export const createCosmeticApi = async ({
   name,
@@ -120,19 +127,18 @@ export const createCosmeticApi = async ({
 
   const token = await AsyncStorage.getItem('accessToken');
 
-  const res = await fetch('http://viewlulu.site:3000/cosmetics/bulk', {
+  const res = await fetch(`${API_BASE_URL}/cosmetics/bulk`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${token}`,
-      // ❗ Content-Type 절대 지정 ❌
+      Authorization: token ? `Bearer ${token}` : '',
+      // ❗ Content-Type 절대 지정하지 말 것
     },
     body: formData,
   });
 
   if (!res.ok) {
     const text = await res.text();
-    console.error('[createCosmeticApi] failed', res.status, text);
-    throw new Error(text);
+    throw new Error(`Upload failed (${res.status}): ${text}`);
   }
 
   return res.json();

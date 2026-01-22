@@ -3,14 +3,14 @@
  * --------------------------------------------------
  * - 화장품 목록 조회
  * - 상단: 화장품 등록 버튼
- * - 하단 카메라 버튼 ❌ 제거
  *
  * ✅ Hook 순서 안전
- * ✅ 등록/수정/삭제 후 자동 갱신
- * ✅ 기존 API / UX 유지
+ * ✅ CaptureStack 복귀 후 안정적 갱신
+ * ✅ 저장 실패 시 기존 목록 유지
+ * ✅ 중복 fetch 완전 차단
  */
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -19,6 +19,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Image,
+  BackHandler,
 } from 'react-native';
 import {
   useNavigation,
@@ -29,7 +30,6 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { colors } from '../theme/colors';
 import { getMyCosmeticsApi } from '../api/cosmetic.api';
 import type { MyPouchStackParamList } from '../navigation/MyPouchStackNavigator';
-import { BackHandler } from 'react-native';
 
 type Nav = NativeStackNavigationProp<MyPouchStackParamList>;
 
@@ -39,8 +39,6 @@ type MyPouchItem = {
   createdAt: string;
   thumbnailUrl: string | null;
 };
-
-
 
 /* S3 썸네일 처리 */
 const S3_BASE_URL =
@@ -56,37 +54,42 @@ const toImageUrl = (keyOrUrl?: string | null) => {
 export default function MyPouchScreen() {
   const navigation = useNavigation<Nav>();
 
-  // 🔹 Hook 순서 고정 (절대 변경 금지)
   const [items, setItems] = useState<MyPouchItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
- /* 🔥 Android 뒤로가기 → Home으로 이동 */
- useFocusEffect(
-   useCallback(() => {
-     const onBackPress = () => {
-       navigation.navigate('Home');
-       return true; // 기본 앱 종료 차단
-     };
+  // 🔒 중복 fetch 방지
+  const fetchingRef = useRef(false);
 
-     const subscription = BackHandler.addEventListener(
-       'hardwareBackPress',
-       onBackPress
-     );
+  /* 🔥 Android 뒤로가기 → Home */
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        navigation.getParent()?.reset({
+          index: 0,
+          routes: [{ name: 'Home' }],
+        });
+        return true;
+      };
 
-     return () => {
-       subscription.remove();
-     };
-   }, [navigation])
- );
+      const sub = BackHandler.addEventListener(
+        'hardwareBackPress',
+        onBackPress
+      );
 
+      return () => sub.remove();
+    }, [navigation])
+  );
 
-  /* 화장품 목록 요청 */
+  /* 🔥 목록 조회 (단일 진입점) */
   const fetchMyCosmetics = async () => {
-    try {
-      setLoading(true);
-      setError(null);
+    if (fetchingRef.current) return;
 
+    fetchingRef.current = true;
+    setLoading(true);
+    setError(null);
+
+    try {
       const data = await getMyCosmeticsApi();
 
       const normalized: MyPouchItem[] = data.map((item: any) => ({
@@ -96,20 +99,18 @@ export default function MyPouchScreen() {
         thumbnailUrl: item.thumbnailUrl ?? null,
       }));
 
+      // ✅ 성공 시에만 갱신
       setItems(normalized);
     } catch {
+      // ❗ 실패해도 기존 items 유지
       setError('화장품 목록을 불러오지 못했습니다.');
     } finally {
+      fetchingRef.current = false;
       setLoading(false);
     }
   };
 
-  /* 최초 1회 */
-  useEffect(() => {
-    fetchMyCosmetics();
-  }, []);
-
-  /* 포커스 복귀 시 자동 갱신 */
+  /* ✅ 화면 진입 / 복귀 시만 실행 */
   useFocusEffect(
     useCallback(() => {
       fetchMyCosmetics();
@@ -123,9 +124,11 @@ export default function MyPouchScreen() {
     });
   };
 
-  /* 🔥 화장품 등록 이동 */
+  /* 🔥 화장품 등록 (CaptureStack) */
   const goRegister = () => {
-    navigation.navigate('CosmeticRegister');
+    navigation.navigate('CaptureStack' as never, {
+      screen: 'CosmeticRegister',
+    } as never);
   };
 
   /* 로딩 */
@@ -148,10 +151,8 @@ export default function MyPouchScreen() {
 
   return (
     <View style={styles.container}>
-      {/* 타이틀 */}
       <Text style={styles.title}>내 파우치</Text>
 
-      {/* 🔥 상단 화장품 등록 버튼 */}
       <TouchableOpacity
         style={styles.primaryButton}
         activeOpacity={0.9}
@@ -162,7 +163,6 @@ export default function MyPouchScreen() {
         </Text>
       </TouchableOpacity>
 
-      {/* 목록 */}
       <FlatList
         data={items}
         keyExtractor={item => String(item.groupId)}
@@ -224,27 +224,19 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
 
-  /* 🔥 등록 버튼 */
   primaryButton: {
     backgroundColor: colors.primary,
     borderRadius: 18,
     paddingVertical: 18,
     alignItems: 'center',
     marginBottom: 28,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 8,
   },
   primaryButtonText: {
     color: '#000',
     fontSize: 16,
     fontWeight: '800',
-    letterSpacing: -0.3,
   },
 
-  /* 카드 */
   card: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -277,9 +269,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
 
-  cardInfo: {
-    flex: 1,
-  },
+  cardInfo: { flex: 1 },
   cardTitle: {
     color: colors.primary,
     fontSize: 18,

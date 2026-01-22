@@ -1,33 +1,30 @@
 /**
  * 📁 CosmeticRegisterScreen.tsx
  * --------------------------------------------------
- * FINAL STABLE
+ * FINAL FIXED STABLE + SafeArea Padding Applied
  *
- * - DetectScreen과 동일한 권한 UX
- * - 진입 즉시 시스템 권한 팝업
- * - CameraGate ❌ 제거 (중복 훅 방지)
- * - 뒤로가기 → MyPouch reset
+ * ✅ reset 신호 수신 시 촬영 상태 완전 초기화
+ * ✅ Confirm → Register 복귀 후 5장/버튼 무반응 방지
+ * ✅ 촬영 플로우 단일 상태 소스 유지
+ * ✅ 뒤로가기 → MyPouch 구조 유지
+ *
+ * ✅ FIXED
+ * - 카메라 세션 화면 이탈 시 완전 종료
+ * - 중복 촬영 / 중복 네비게이션 방지
+ * - Confirm 이동 직전 카메라 OFF + 딜레이
+ * - CaptureStack 분리 구조에서도 TabBar 안전 처리
+ * - 🔥 SafeArea 기반 상단 여백 (홈 타이틀과 시각적 통일)
  */
 
-import React, {
-  useRef,
-  useState,
-  useCallback,
-  useEffect,
-} from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Image,
-} from 'react-native';
+import React, { useRef, useState, useCallback, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import {
   Camera,
   useCameraDevice,
   useCameraPermission,
 } from 'react-native-vision-camera';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 /* ================= Constants ================= */
 
@@ -41,14 +38,20 @@ const CAPTURE_GUIDE = [
 ];
 
 export default function CosmeticRegisterScreen() {
+  const insets = useSafeAreaInsets(); // 🔥 SafeArea
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   const cameraRef = useRef<Camera>(null);
 
   const device = useCameraDevice('back');
   const { hasPermission, requestPermission } = useCameraPermission();
 
   const [photos, setPhotos] = useState<string[]>([]);
-  const isResettingRef = useRef(false);
+  const [isActive, setIsActive] = useState(false);
+
+  // 내부 제어용 ref
+  const isNavigatingRef = useRef(false);
+  const isCapturingRef = useRef(false);
 
   /* ================= Permission ================= */
 
@@ -56,37 +59,99 @@ export default function CosmeticRegisterScreen() {
     if (!hasPermission) requestPermission();
   }, [hasPermission, requestPermission]);
 
+  /* ================= Focus: Camera On / Off ================= */
+
+  useFocusEffect(
+    useCallback(() => {
+      // ✅ 카메라 ON
+      setIsActive(true);
+
+      // ✅ 탭바 숨김
+      const parent = navigation.getParent();
+      parent?.setOptions({
+        tabBarStyle: { display: 'none' },
+      });
+
+      return () => {
+        // ✅ 카메라 OFF
+        setIsActive(false);
+
+        // ✅ 탭바 복구
+        parent?.setOptions({
+          tabBarStyle: undefined,
+        });
+      };
+    }, [navigation])
+  );
+
+
+  /* ================= Reset (Confirm → Register) ================= */
+
+  useFocusEffect(
+    useCallback(() => {
+      if (route.params?.reset) {
+        setPhotos([]);
+        isNavigatingRef.current = false;
+        isCapturingRef.current = false;
+
+        setIsActive(true);
+        navigation.setParams({ reset: false });
+      }
+    }, [route.params?.reset, navigation])
+  );
+
+  /* ================= Back Handling ================= */
+
   /* ================= Back Handling ================= */
 
   useEffect(() => {
-    const unsubscribe = navigation.addListener('beforeRemove', (e) => {
-      if (isResettingRef.current) return;
+    const unsubscribe = navigation.addListener('beforeRemove', (e: any) => {
+      if (isNavigatingRef.current) return;
 
       e.preventDefault();
-      isResettingRef.current = true;
+      isNavigatingRef.current = true;
+
+      setIsActive(false);
 
       navigation.reset({
         index: 0,
         routes: [
           {
-            name: 'Main',
+            name: 'MainTabs',
             state: {
-              routes: [{ name: 'MyPouch' }],
+              routes: [
+                {
+                  name: 'MyPouch', // ✅ 실제 탭 이름
+                  state: {
+                    routes: [{ name: 'MyPouch' }],
+                  },
+                },
+              ],
             },
           },
         ],
       });
-    });
+    }); // ✅ addListener 닫힘
 
     return unsubscribe;
   }, [navigation]);
 
-  /* ================= Focus Reset ================= */
+
+  /* ================= TabBar Hide ================= */
 
   useFocusEffect(
     useCallback(() => {
-      setPhotos([]);
-    }, [])
+      const parent = navigation.getParent?.();
+      parent?.setOptions?.({
+        tabBarStyle: { display: 'none' },
+      });
+
+      return () => {
+        parent?.setOptions?.({
+          tabBarStyle: { display: 'flex' },
+        });
+      };
+    }, [navigation])
   );
 
   /* ================= Capture ================= */
@@ -97,14 +162,38 @@ export default function CosmeticRegisterScreen() {
     CAPTURE_GUIDE[CAPTURE_GUIDE.length - 1];
 
   const handleCapture = async () => {
-    if (!cameraRef.current || currentIndex >= MAX_PHOTOS) return;
+    if (
+      !cameraRef.current ||
+      !device ||
+      currentIndex >= MAX_PHOTOS ||
+      isNavigatingRef.current ||
+      isCapturingRef.current ||
+      !isActive
+    ) {
+      return;
+    }
 
-    const photo = await cameraRef.current.takePhoto();
-    const next = [...photos, `file://${photo.path}`];
-    setPhotos(next);
+    isCapturingRef.current = true;
 
-    if (next.length === MAX_PHOTOS) {
-      navigation.navigate('CosmeticConfirm', { photos: next });
+    try {
+      const photo = await cameraRef.current.takePhoto();
+      const uri = `file://${photo.path}`;
+
+      if (currentIndex + 1 === MAX_PHOTOS) {
+        isNavigatingRef.current = true;
+
+        setIsActive(false);
+        await new Promise(r => setTimeout(r, 150));
+
+        navigation.navigate('CosmeticConfirm', {
+          photos: [...photos, uri],
+        });
+        return;
+      }
+
+      setPhotos(prev => [...prev, uri]);
+    } finally {
+      isCapturingRef.current = false;
     }
   };
 
@@ -113,13 +202,8 @@ export default function CosmeticRegisterScreen() {
   if (!hasPermission) {
     return (
       <View style={styles.center}>
-        <Text style={styles.permissionText}>
-          카메라 권한이 필요합니다.
-        </Text>
-        <TouchableOpacity
-          style={styles.permissionBtn}
-          onPress={requestPermission}
-        >
+        <Text style={styles.permissionText}>카메라 권한이 필요합니다.</Text>
+        <TouchableOpacity style={styles.permissionBtn} onPress={requestPermission}>
           <Text style={styles.permissionBtnText}>권한 허용</Text>
         </TouchableOpacity>
       </View>
@@ -140,11 +224,19 @@ export default function CosmeticRegisterScreen() {
         ref={cameraRef}
         style={StyleSheet.absoluteFill}
         device={device}
-        isActive
+        isActive={isActive}
         photo
       />
 
-      <View style={styles.topOverlay}>
+      {/* 🔥 SafeArea 기반 상단 오버레이 */}
+      <View
+        style={[
+          styles.topOverlay,
+          {
+            paddingTop: insets.top + 24, // 홈 paddingTop:48과 시각적 통일
+          },
+        ]}
+      >
         <Text style={styles.step}>
           {currentIndex + 1} / {MAX_PHOTOS}
         </Text>
@@ -161,10 +253,7 @@ export default function CosmeticRegisterScreen() {
         </View>
       )}
 
-      <TouchableOpacity
-        style={styles.captureButton}
-        onPress={handleCapture}
-      >
+      <TouchableOpacity style={styles.captureButton} onPress={handleCapture}>
         <Text style={styles.captureText}>촬영하기</Text>
       </TouchableOpacity>
     </View>
@@ -181,26 +270,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  permissionText: {
-    color: '#FFD400',
-    fontSize: 15,
-    marginBottom: 16,
-  },
+  permissionText: { color: '#FFD400', fontSize: 15, marginBottom: 16 },
   permissionBtn: {
     backgroundColor: '#FFD400',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 12,
   },
-  permissionBtnText: {
-    color: '#000',
-    fontWeight: '700',
-  },
+  permissionBtnText: { color: '#000', fontWeight: '700' },
   topOverlay: {
     position: 'absolute',
     top: 0,
     width: '100%',
-    paddingVertical: 18,
+    paddingBottom: 18,
     paddingHorizontal: 20,
     backgroundColor: 'rgba(0,0,0,0.65)',
   },

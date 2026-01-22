@@ -20,6 +20,7 @@
  *   - session/invalid-output-configuration 에러 제거
  */
 
+
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   View,
@@ -41,25 +42,20 @@ import {
   useFocusEffect,
   useRoute,
 } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ImageResizer from 'react-native-image-resizer';
 
 import { colors } from '../theme/colors';
 import { detectCosmeticApi } from '../api/cosmeticDetect.api';
 
-/* ================= DEBUG ================= */
-
-const now = () => new Date().toISOString().slice(11, 23);
-const log = (...a: any[]) => console.log(`[${now()}][Detect]`, ...a);
-const errlog = (...a: any[]) =>
-  console.error(`[${now()}][Detect][ERR]`, ...a);
-
 /* ================= Component ================= */
 
 export default function CosmeticDetectScreen() {
   const navigation = useNavigation<any>();
-  const route = useRoute<any>(); // ✅ 위치 수정
-  const cameraRef = useRef<Camera>(null);
+  const route = useRoute<any>();
+  const insets = useSafeAreaInsets();
 
+  const cameraRef = useRef<Camera>(null);
   const device = useCameraDevice('back');
   const { hasPermission, requestPermission } = useCameraPermission();
 
@@ -69,7 +65,6 @@ export default function CosmeticDetectScreen() {
   const mountedRef = useRef(true);
   const alertOpenRef = useRef(false);
   const navigatedRef = useRef(false);
-
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
 
   /* ================= Mount ================= */
@@ -107,24 +102,20 @@ export default function CosmeticDetectScreen() {
       if (mountedRef.current && !loading && !alertOpenRef.current) {
         setIsActive(true);
       }
-
       return () => {
         if (mountedRef.current) setIsActive(false);
       };
     }, [])
   );
 
-  /* ================= 🔥 RESET 처리 ================= */
+  /* ================= RESET ================= */
 
   useEffect(() => {
     if (route.params?.reset) {
-      log('RESET REQUESTED');
-
       navigatedRef.current = false;
       alertOpenRef.current = false;
       setLoading(false);
       setIsActive(true);
-
       navigation.setParams({ reset: false });
     }
   }, [route.params?.reset, navigation]);
@@ -160,33 +151,25 @@ export default function CosmeticDetectScreen() {
 
       navigatedRef.current = true;
 
-      navigation.replace('CosmeticDetectResult', {
-        cosmeticId: result?.detectedId ?? null,
-        score: result?.score ?? null,
+      navigation.navigate('CosmeticDetectResult', {
+        cosmeticId: result.detectedId,
+        score: result.score,
+        fromDetect: true,
       });
-    } catch (e: any) {
-      errlog('detect error', e?.message, e);
 
+    } catch (e: any) {
       Alert.alert(
         '인식 실패',
-        '등록된 화장품과 일치하지 않습니다.',
+        '인식에 실패하였습니다. 다시 촬영해주세요.',
         [{ text: '확인' }],
         { cancelable: false }
       );
     } finally {
       setLoading(false);
-
-      const canResume =
-        appStateRef.current === 'active' &&
-        !alertOpenRef.current &&
-        !navigatedRef.current;
-
-      if (canResume) {
-        await new Promise((r) => setTimeout(r, 200));
-        setIsActive(true);
-      }
+      // ❗ 여기서는 재활성화하지 않음 (이미 reset으로 종료됨)
     }
   };
+
 
   /* ================= Render ================= */
 
@@ -194,10 +177,7 @@ export default function CosmeticDetectScreen() {
     return (
       <View style={styles.center}>
         <Text style={styles.text}>카메라 권한이 필요합니다.</Text>
-        <TouchableOpacity
-          style={styles.primaryBtn}
-          onPress={requestPermission}
-        >
+        <TouchableOpacity style={styles.primaryBtn} onPress={requestPermission}>
           <Text style={styles.primaryText}>권한 허용</Text>
         </TouchableOpacity>
       </View>
@@ -222,6 +202,20 @@ export default function CosmeticDetectScreen() {
         photo
       />
 
+      {/* 🔥 SafeArea 상단 제목 (Detect 타이틀) */}
+      <View
+        style={[
+          styles.topOverlay,
+          {
+            paddingTop: insets.top + 24,
+          },
+        ]}
+      >
+        <Text style={styles.title}>화장품 인식</Text>
+        <Text style={styles.sub}>카메라로 화장품을 비추면 내 파우치 안에 어떤 제품인지 알려드려요</Text>
+      </View>
+
+      {/* 하단 버튼 */}
       <View style={styles.overlay}>
         <TouchableOpacity
           style={styles.captureButton}
@@ -256,6 +250,27 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   primaryText: { color: '#000', fontWeight: '700' },
+
+  /* 🔥 상단 SafeArea 제목 */
+  topOverlay: {
+    position: 'absolute',
+    top: 0,
+    width: '100%',
+    paddingHorizontal: 20,
+    paddingBottom: 18,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+  },
+  title: {
+    color: colors.primary,
+    fontSize: 24,
+    fontWeight: '800',
+    marginBottom: 6,
+  },
+  sub: {
+    color: '#fff',
+    fontSize: 14,
+  },
+
   overlay: {
     position: 'absolute',
     bottom: 100,

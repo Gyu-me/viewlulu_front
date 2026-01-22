@@ -1,13 +1,20 @@
 /**
- * HomeScreen (FINAL)
+ * HomeScreen (FINAL DEPLOY STABLE)
  * --------------------------------------------------
  * - 홈 요약 화면
  * - 하단 중앙: 화장품 인식(Detect) 버튼
  * - 화장품 등록 버튼 ❌ (MyPouch로 이동됨)
  * - ✅ Android 하드웨어 뒤로가기 → 앱 종료 확인
+ *
+ * ✅ 재빌드/핫리로드 후 요약 0으로 굳는 문제 방지:
+ * - mount 1회 fetch(useEffect[]) 제거
+ * - focus 진입 시 fetch로 통일 (MyPouch와 동일 패턴)
+ * - data가 0개여도 count/over12/over24를 0으로 확정 세팅
+ *
+ * ✅ UI/UX 변경 없음
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -17,10 +24,7 @@ import {
   BackHandler,
   Alert,
 } from 'react-native';
-import {
-  useNavigation,
-  useFocusEffect,
-} from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { colors } from '../theme/colors';
@@ -42,9 +46,13 @@ type CosmeticItem = {
 export default function HomeScreen() {
   const navigation = useNavigation<Nav>();
 
+  const [count, setCount] = useState(0);
+  const [over12, setOver12] = useState(0);
+  const [over24, setOver24] = useState(0);
+
   /* 🔥 Android 뒤로가기 → 앱 종료 */
   useFocusEffect(
-    React.useCallback(() => {
+    useCallback(() => {
       const onBackPress = () => {
         Alert.alert(
           '앱 종료',
@@ -55,7 +63,7 @@ export default function HomeScreen() {
           ],
           { cancelable: true }
         );
-        return true; // 기본 뒤로가기 차단
+        return true;
       };
 
       const subscription = BackHandler.addEventListener(
@@ -64,45 +72,52 @@ export default function HomeScreen() {
       );
 
       return () => {
-        subscription.remove(); // ✅ 이것만 써야 함
+        subscription.remove();
       };
     }, [])
   );
 
+  /* ✅ 포커스 진입 시 요약 데이터 로딩 (정석) */
+  const fetchSummary = useCallback(async () => {
+    try {
+      const data: CosmeticItem[] = await getMyCosmeticsApi();
 
-  const [count, setCount] = useState(0);
-  const [over12, setOver12] = useState(0);
-  const [over24, setOver24] = useState(0);
+      // ✅ 0개여도 값을 0으로 확정 (이게 안정화 포인트)
+      if (!data || data.length === 0) {
+        setCount(0);
+        setOver12(0);
+        setOver24(0);
+        return;
+      }
 
-  /* 요약 데이터 로딩 */
-  useEffect(() => {
-    const fetchSummary = async () => {
-      try {
-        const data: CosmeticItem[] = await getMyCosmeticsApi();
-        if (data.length === 0) return;
+      const now = new Date();
+      let c12 = 0;
+      let c24 = 0;
 
-        const now = new Date();
-        let c12 = 0;
-        let c24 = 0;
+      data.forEach(item => {
+        const created = new Date(item.createdAt);
+        const diffMonths =
+          (now.getFullYear() - created.getFullYear()) * 12 +
+          (now.getMonth() - created.getMonth());
 
-        data.forEach(item => {
-          const created = new Date(item.createdAt);
-          const diffMonths =
-            (now.getFullYear() - created.getFullYear()) * 12 +
-            (now.getMonth() - created.getMonth());
+        if (diffMonths >= 24) c24++;
+        else if (diffMonths >= 12) c12++;
+      });
 
-          if (diffMonths >= 24) c24++;
-          else if (diffMonths >= 12) c12++;
-        });
-
-        setCount(data.length);
-        setOver12(c12);
-        setOver24(c24);
-      } catch {}
-    };
-
-    fetchSummary();
+      setCount(data.length);
+      setOver12(c12);
+      setOver24(c24);
+    } catch {
+      // UI/UX 변경 없이: 실패 시 값은 그대로 둠
+      // (원하면 여기서 로그만 추가 가능)
+    }
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchSummary();
+    }, [fetchSummary])
+  );
 
   return (
     <View style={styles.container}>
@@ -151,9 +166,9 @@ export default function HomeScreen() {
         <TouchableOpacity
           style={styles.fab}
           onPress={() =>
-            navigation.navigate('MyPouch', {
+            navigation.navigate('CaptureStack', {
               screen: 'CosmeticDetect',
-            })
+            } as never)
           }
         >
           <Image source={CameraIcon} style={styles.fabIcon} />
