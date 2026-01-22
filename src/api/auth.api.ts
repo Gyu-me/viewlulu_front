@@ -2,7 +2,7 @@
  * auth.api.ts (🔥 FINAL CONFIRMED)
  * --------------------------------------------------
  * ✅ api.ts 인스턴스 사용
- *    - baseURL = https://viewlulu.site/api
+ *    - baseURL = https://viewlulu.site
  * ✅ 로그인 / 회원가입 서버 curl 테스트와 완전 동일
  * ✅ Authorization 인터셉터 사용 ❌ (로그인은 토큰 불필요)
  * ✅ detect / cosmetics API와 경로 체계 완전 통일
@@ -24,10 +24,11 @@ export type AuthUser = {
 };
 
 /**
- * 로그인 응답
+ * 로그인 응답 (🔥 access + refresh)
  */
 export type LoginResponse = {
-  token: string;
+  accessToken: string;
+  refreshToken: string;
   user: AuthUser;
 };
 
@@ -52,7 +53,7 @@ export type RegisterResponse = AuthUser;
 
 /**
  * 로그인
- * POST /api/auth/login
+ * POST /auth/login
  */
 export const loginApi = async (
   email: string,
@@ -68,7 +69,7 @@ export const loginApi = async (
 
 /**
  * 회원가입
- * POST /api/auth/register
+ * POST /auth/register
  */
 export const registerApi = async (
   data: RegisterRequest,
