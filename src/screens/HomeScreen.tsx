@@ -4,6 +4,7 @@
  * - 홈 요약 화면
  * - 하단 중앙: 화장품 인식(Detect) 버튼
  * - 화장품 등록 버튼 ❌ (MyPouch로 이동됨)
+ * - ✅ Android 하드웨어 뒤로가기 → 앱 종료 확인
  */
 
 import React, { useEffect, useState } from 'react';
@@ -13,8 +14,13 @@ import {
   StyleSheet,
   TouchableOpacity,
   Image,
+  BackHandler,
+  Alert,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import {
+  useNavigation,
+  useFocusEffect,
+} from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { colors } from '../theme/colors';
@@ -35,6 +41,34 @@ type CosmeticItem = {
 
 export default function HomeScreen() {
   const navigation = useNavigation<Nav>();
+
+  /* 🔥 Android 뒤로가기 → 앱 종료 */
+  useFocusEffect(
+    React.useCallback(() => {
+      const onBackPress = () => {
+        Alert.alert(
+          '앱 종료',
+          '앱을 종료하시겠습니까?',
+          [
+            { text: '취소', style: 'cancel' },
+            { text: '종료', onPress: () => BackHandler.exitApp() },
+          ],
+          { cancelable: true }
+        );
+        return true; // 기본 뒤로가기 차단
+      };
+
+      const subscription = BackHandler.addEventListener(
+        'hardwareBackPress',
+        onBackPress
+      );
+
+      return () => {
+        subscription.remove(); // ✅ 이것만 써야 함
+      };
+    }, [])
+  );
+
 
   const [count, setCount] = useState(0);
   const [over12, setOver12] = useState(0);
@@ -122,7 +156,6 @@ export default function HomeScreen() {
             })
           }
         >
-
           <Image source={CameraIcon} style={styles.fabIcon} />
         </TouchableOpacity>
       </View>

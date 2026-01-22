@@ -29,6 +29,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { colors } from '../theme/colors';
 import { getMyCosmeticsApi } from '../api/cosmetic.api';
 import type { MyPouchStackParamList } from '../navigation/MyPouchStackNavigator';
+import { BackHandler } from 'react-native';
 
 type Nav = NativeStackNavigationProp<MyPouchStackParamList>;
 
@@ -38,6 +39,8 @@ type MyPouchItem = {
   createdAt: string;
   thumbnailUrl: string | null;
 };
+
+
 
 /* S3 썸네일 처리 */
 const S3_BASE_URL =
@@ -57,6 +60,26 @@ export default function MyPouchScreen() {
   const [items, setItems] = useState<MyPouchItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+ /* 🔥 Android 뒤로가기 → Home으로 이동 */
+ useFocusEffect(
+   useCallback(() => {
+     const onBackPress = () => {
+       navigation.navigate('Home');
+       return true; // 기본 앱 종료 차단
+     };
+
+     const subscription = BackHandler.addEventListener(
+       'hardwareBackPress',
+       onBackPress
+     );
+
+     return () => {
+       subscription.remove();
+     };
+   }, [navigation])
+ );
+
 
   /* 화장품 목록 요청 */
   const fetchMyCosmetics = async () => {

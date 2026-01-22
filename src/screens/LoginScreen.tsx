@@ -2,7 +2,7 @@
  * LoginScreen (🔥 FINAL STABLE)
  * --------------------------------------------------
  * ✅ 실제 로그인 API 연동
- * ✅ JWT AsyncStorage 저장 (완료 보장)
+ * ✅ accessToken + refreshToken AsyncStorage 저장 (완료 보장)
  * ✅ 로그인 실패 사유 정확히 분기
  * ✅ 성공 시 Main 진입
  */
@@ -44,56 +44,31 @@ export default function LoginScreen() {
     try {
       setLoading(true);
 
-      const { token, user } = await loginApi(email, password);
+      const { accessToken, refreshToken, user } =
+        await loginApi(email, password);
 
-      /**
-       * 🔥 토큰 저장 완료 보장
-       */
       await AsyncStorage.multiSet([
-        ['accessToken', token],
+        ['accessToken', accessToken],
+        ['refreshToken', refreshToken],
         ['user', JSON.stringify(user)],
       ]);
 
-      // 🔐 다음 API에서 토큰이 100% 존재하도록 보장
+      // 저장 확인 (디버그용)
       await AsyncStorage.getItem('accessToken');
 
       navigation.replace('Main');
     } catch (err: any) {
-      /**
-       * 🔥 axios / custom error 모두 대응
-       */
       const message =
-        err?.message ||
         err?.response?.data?.message ||
+        err?.message ||
         '로그인에 실패했습니다.';
 
-      if (
-        message.includes('존재하지') ||
-        message.includes('not found')
-      ) {
-        Alert.alert(
-          '계정을 찾을 수 없습니다',
-          '회원가입을 진행하시겠습니까?',
-          [
-            { text: '취소', style: 'cancel' },
-            {
-              text: '회원가입',
-              onPress: () => navigation.navigate('Register'),
-            },
-          ],
-        );
-      } else if (
-        message.includes('비밀번호') ||
-        message.includes('password')
-      ) {
-        Alert.alert('로그인 실패', '비밀번호가 올바르지 않습니다.');
-      } else {
-        Alert.alert('로그인 실패', message);
-      }
+      Alert.alert('로그인 실패', message);
     } finally {
       setLoading(false);
     }
   };
+
 
   return (
     <View style={styles.container}>
@@ -101,8 +76,9 @@ export default function LoginScreen() {
       <Image source={AppIcon} style={styles.appIcon} />
 
       <Text style={styles.title}>뷰루루</Text>
-      <Text style={styles.subTitle}>시각장애인을 위한 뷰티 도우미</Text>
-
+      <Text style={styles.subTitle}>
+        시각장애인을 위한 뷰티 도우미
+      </Text>
 
       <TextInput
         style={styles.input}
@@ -197,12 +173,11 @@ const styles = StyleSheet.create({
     textDecorationLine: 'underline',
     fontWeight: '600',
   },
-    appIcon: {
-      width: 120,
-      height: 120,
-      resizeMode: 'contain',
-      alignSelf: 'center',
-      marginBottom: 24,
-    },
-
+  appIcon: {
+    width: 120,
+    height: 120,
+    resizeMode: 'contain',
+    alignSelf: 'center',
+    marginBottom: 24,
+  },
 });

@@ -1,14 +1,23 @@
 /**
- * RootNavigator (최종 안정본 + SafeArea 적용)
+ * RootNavigator (✅ FINAL STABLE + Auth Bootstrap 적용)
  * --------------------------------------------------
+ * ✅ 기존 기능 100% 유지:
  * - Home / Settings UI 절대 변경 없음
- * - MyPouch 탭에서 다른 탭으로 이동하면 자동 popToTop
+ * - MyPouch 탭에서 다른 탭 이동 시 popToTop
  * - 다시 MyPouch로 오면 항상 MyPouchScreen부터 시작
- * - ✅ Android 시스템 네비게이션 바(Safe Area) 자동 대응
+ * - Android 시스템 네비게이션 바(Safe Area) 자동 대응
+ * - 앱 재실행 시 자동 로그인 유지
+ *
+ * ✅ 이번 수정(핵심):
+ * - refreshToken 존재만으로 Main 진입하지 않음
+ * - 앱 부팅 시 /auth/refresh로 accessToken 재발급 성공해야 Main 진입
+ * - 실패 시에만 Login으로
+ * - 재빌드/핫리로드로 JS 상태가 초기화되어도 "토큰 준비 완료" 후 화면 진입
  */
 
-import React from 'react';
-import { Image, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Image, View, ActivityIndicator } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
@@ -22,6 +31,8 @@ import HomeStackNavigator from './HomeStackNavigator';
 import MyPouchStackNavigator from './MyPouchStackNavigator';
 import SettingsStackNavigator from './SettingsStackNavigator';
 import FeatureStackNavigator from './FeatureStackNavigator';
+
+import { API_BASE_URL } from '@env';
 
 const PouchIcon = require('../assets/pouchicon.png');
 const HomeIcon = require('../assets/home.png');
@@ -44,7 +55,6 @@ const BASE_TAB_STYLE = {
 /* ================= Tab Navigator ================= */
 
 function TabNavigator() {
-  // 🔥 핵심: OS가 알려주는 하단 Safe Area (안드로이드 뒤로/홈 바)
   const insets = useSafeAreaInsets();
 
   return (
@@ -54,14 +64,11 @@ function TabNavigator() {
         headerShown: false,
         tabBarActiveTintColor: '#FFD400',
         tabBarInactiveTintColor: '#FFFFFF',
-
-        // ✅ 기존 디자인 유지 + Safe Area만 자동 보정
         tabBarStyle: {
           ...BASE_TAB_STYLE,
           paddingBottom: BASE_TAB_STYLE.paddingBottom + insets.bottom,
           height: BASE_TAB_STYLE.height + insets.bottom,
         },
-
         tabBarBackground: () => (
           <View style={{ flex: 1, backgroundColor: '#000' }} />
         ),
@@ -72,35 +79,27 @@ function TabNavigator() {
         },
       }}
     >
-      {/* ================= MyPouch ================= */}
       <Tab.Screen
         name="MyPouch"
         component={MyPouchStackNavigator}
         options={({ route }) => {
-          const routeName =
-            getFocusedRouteNameFromRoute(route) ?? 'MyPouch';
+          const routeName = getFocusedRouteNameFromRoute(route) ?? 'MyPouch';
 
           const hideTab =
             routeName === 'CosmeticDetect' ||
             routeName === 'CosmeticDetectResult' ||
             routeName === 'CosmeticDetail' ||
-            routeName === 'CosmeticRegister'; //지울수도있음 ;;
+            routeName === 'CosmeticRegister';
 
           return {
-            // ✅ 기존 기능 그대로 유지
             popToTopOnBlur: true,
-
-            // ❗ 탭 숨김 시에도 SafeArea 계산은 유지
             tabBarStyle: hideTab
               ? { display: 'none' }
               : {
                   ...BASE_TAB_STYLE,
-                  paddingBottom:
-                    BASE_TAB_STYLE.paddingBottom + insets.bottom,
-                  height:
-                    BASE_TAB_STYLE.height + insets.bottom,
+                  paddingBottom: BASE_TAB_STYLE.paddingBottom + insets.bottom,
+                  height: BASE_TAB_STYLE.height + insets.bottom,
                 },
-
             tabBarIcon: ({ focused }) => (
               <Image
                 source={PouchIcon}
@@ -115,7 +114,6 @@ function TabNavigator() {
         }}
       />
 
-      {/* ================= Home (절대 변경 없음) ================= */}
       <Tab.Screen
         name="Home"
         component={HomeStackNavigator}
@@ -133,7 +131,6 @@ function TabNavigator() {
         }}
       />
 
-      {/* ================= Settings (절대 변경 없음) ================= */}
       <Tab.Screen
         name="Settings"
         component={SettingsStackNavigator}
@@ -156,9 +153,90 @@ function TabNavigator() {
 
 /* ================= Root Stack ================= */
 
+type InitialRoute = 'Login' | 'Main' | null;
+
 export default function RootNavigator() {
+  const [initialRoute, setInitialRoute] = useState<InitialRoute>(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const bootstrapAuth = async () => {
+      try {
+        // 1) refreshToken이 없으면 바로 Login
+        const refreshToken = await AsyncStorage.getItem('refreshToken');
+        if (!refreshToken) {
+          if (mounted) setInitialRoute('Login');
+          return;
+        }
+
+        // 2) refreshToken이 있으면 "반드시" refresh로 accessToken 재발급 성공해야 Main
+        //    - 여기서 성공하면 JS 재빌드/핫리로드로 메모리가 초기화돼도 accessToken을 다시 확보함
+        const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          // ✅ Authorization 절대 넣지 않음 (설계 유지)
+          body: JSON.stringify({ refreshToken }),
+        });
+
+        if (!res.ok) {
+          // refresh 실패 => 로그인 상태로 볼 수 없음
+          // (여기서 토큰을 지울지 여부는 정책인데,
+          //  "실패 시에만 삭제" 규칙을 Root에서도 동일하게 적용)
+          await AsyncStorage.multiRemove(['accessToken', 'refreshToken', 'user']);
+          if (mounted) setInitialRoute('Login');
+          return;
+        }
+
+        const data = await res.json();
+
+        // ✅ 백엔드가 { accessToken, refreshToken } 또는 { accessToken } 형태일 수 있으니 방어
+        const newAccessToken: string | undefined = data?.accessToken;
+        const newRefreshToken: string | undefined = data?.refreshToken;
+
+        if (!newAccessToken) {
+          // accessToken이 없으면 refresh 성공으로 볼 수 없음
+          await AsyncStorage.multiRemove(['accessToken', 'refreshToken', 'user']);
+          if (mounted) setInitialRoute('Login');
+          return;
+        }
+
+        // 3) 토큰 저장 (기존 규칙 유지: refresh 성공 시에만 갱신)
+        await AsyncStorage.setItem('accessToken', newAccessToken);
+        if (newRefreshToken) {
+          await AsyncStorage.setItem('refreshToken', newRefreshToken);
+        }
+
+        // 4) 이제서야 Main 진입
+        if (mounted) setInitialRoute('Main');
+      } catch (e) {
+        // 네트워크/예외 => 안전하게 로그인 화면으로 (토큰은 유지할 수도 있으나,
+        // 현재 증상(재빌드 후 꼬임)을 막기 위해 "부팅 단계에서 확실히 정리"하는 쪽이 안정적)
+        await AsyncStorage.multiRemove(['accessToken', 'refreshToken', 'user']);
+        if (mounted) setInitialRoute('Login');
+      }
+    };
+
+    bootstrapAuth();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // ⏳ 부팅/토큰 준비 중 로딩 (기존 유지)
+  if (!initialRoute) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#FFD400" />
+      </View>
+    );
+  }
+
   return (
-    <Stack.Navigator initialRouteName="Login">
+    <Stack.Navigator initialRouteName={initialRoute}>
       <Stack.Screen
         name="Login"
         component={LoginScreen}
@@ -172,13 +250,6 @@ export default function RootNavigator() {
         component={TabNavigator}
         options={{ headerShown: false }}
       />
-
-      <Stack.Screen
-        name="CosmeticConfirm"
-        component={CosmeticConfirmScreen}
-        options={{ title: '화장품 확인' }}
-      />
-
     </Stack.Navigator>
   );
 }

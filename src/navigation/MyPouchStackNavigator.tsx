@@ -13,6 +13,7 @@ import CosmeticDetectScreen from '../screens/CosmeticDetectScreen';
 import CosmeticDetectResultScreen from '../screens/CosmeticDetectResultScreen';
 import CosmeticDetailScreen from '../screens/CosmeticDetailScreen';
 import CosmeticRegisterScreen from '../screens/CosmeticRegisterScreen';
+import CosmeticConfirmScreen from '../screens/CosmeticConfirmScreen';
 
 
 export type MyPouchStackParamList = {
@@ -66,6 +67,12 @@ export default function MyPouchStackNavigator() {
         name="CosmeticRegister"
         component={CosmeticRegisterScreen}
         options={{ title: '화장품 등록' }}
+      />
+
+      <Stack.Screen
+        name="CosmeticConfirm"
+        component={CosmeticConfirmScreen}
+        options={{ title: '화장품 확인' }}
       />
 
     </Stack.Navigator>

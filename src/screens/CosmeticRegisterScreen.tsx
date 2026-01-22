@@ -1,14 +1,14 @@
 /**
- * 📁 CosmeticRegisterScreen.tsx (최종본)
+ * 📁 CosmeticRegisterScreen.tsx
  * --------------------------------------------------
- * [촬영 전용 화면]
- * - 화장품 촬영 전용
- * - 정면 / 측면 / 상단 / 추가 사진 총 4장 촬영
- * - 4장 촬영 완료 시 CosmeticConfirmScreen으로 이동
- * - ❗ 촬영만 담당 (저장 X)
+ * FINAL STABLE (촬영 상태 완전 초기화)
+ *
+ * - 화면에 들어올 때마다 촬영 상태 초기화
+ * - Confirm → 재촬영 → Register 진입 시 이전 기록 완전 제거
+ * - 뒤로가기 시 MyPouch로 즉시 종료
  */
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -17,17 +17,20 @@ import {
   Image,
 } from 'react-native';
 import { Camera, useCameraDevice } from 'react-native-vision-camera';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 
 import CameraGate from '../components/CameraGate';
+import { BackHandler } from 'react-native';
+import { useEffect } from 'react';
+
 
 const MAX_PHOTOS = 4;
 
 const CAPTURE_GUIDE = [
   { title: '정면 촬영', desc: '화장품의 정면이 보이도록 촬영해주세요' },
-  { title: '측면 촬영', desc: '화장품의 옆면이 보이도록 촬영해주세요' },
+  { title: '후면 촬영', desc: '화장품의 뒷면이 보이도록 촬영해주세요' },
   { title: '상단 촬영', desc: '화장품의 위쪽이 보이도록 촬영해주세요' },
-  { title: '추가 촬영', desc: '화장품의 특징이 잘 보이도록 촬영해주세요' },
+  { title: '하단 촬영', desc: '화장품의 바닥이 잘 보이도록 촬영해주세요' },
 ];
 
 export default function CosmeticRegisterScreen() {
@@ -36,8 +39,46 @@ export default function CosmeticRegisterScreen() {
   const navigation = useNavigation<any>();
 
   const [photos, setPhotos] = useState<string[]>([]);
-  const currentIndex = photos.length;
+  const isResettingRef = useRef(false);
 
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+      // 🔥 이미 우리가 reset 중이면 그냥 통과
+      if (isResettingRef.current) {
+        return;
+      }
+
+      e.preventDefault();
+      isResettingRef.current = true;
+
+      navigation.reset({
+        index: 0,
+        routes: [
+          {
+            name: 'Main',
+            state: {
+              routes: [{ name: 'MyPouch' }],
+            },
+          },
+        ],
+      });
+    });
+
+    return unsubscribe;
+  }, [navigation]);
+
+
+
+  /* ================= 🔥 핵심: 화면 진입 시 무조건 초기화 ================= */
+
+  useFocusEffect(
+    useCallback(() => {
+      // 🔥 이전 촬영 기록 완전 제거
+      setPhotos([]);
+    }, [])
+  );
+
+  const currentIndex = photos.length;
   const currentGuide =
     CAPTURE_GUIDE[currentIndex] ??
     CAPTURE_GUIDE[CAPTURE_GUIDE.length - 1];
@@ -46,11 +87,11 @@ export default function CosmeticRegisterScreen() {
     if (!cameraRef.current || currentIndex >= MAX_PHOTOS) return;
 
     const photo = await cameraRef.current.takePhoto();
-    const nextPhotos = [...photos, `file://${photo.path}`];
-    setPhotos(nextPhotos);
+    const next = [...photos, `file://${photo.path}`];
+    setPhotos(next);
 
-    if (nextPhotos.length === MAX_PHOTOS) {
-      navigation.navigate('CosmeticConfirm', { photos: nextPhotos });
+    if (next.length === MAX_PHOTOS) {
+      navigation.navigate('CosmeticConfirm', { photos: next });
     }
   };
 
