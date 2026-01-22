@@ -1,14 +1,20 @@
 /**
  * 📁 CosmeticRegisterScreen.tsx
  * --------------------------------------------------
- * FINAL STABLE (촬영 상태 완전 초기화)
+ * FINAL STABLE
  *
- * - 화면에 들어올 때마다 촬영 상태 초기화
- * - Confirm → 재촬영 → Register 진입 시 이전 기록 완전 제거
- * - 뒤로가기 시 MyPouch로 즉시 종료
+ * - DetectScreen과 동일한 권한 UX
+ * - 진입 즉시 시스템 권한 팝업
+ * - CameraGate ❌ 제거 (중복 훅 방지)
+ * - 뒤로가기 → MyPouch reset
  */
 
-import React, { useRef, useState, useCallback } from 'react';
+import React, {
+  useRef,
+  useState,
+  useCallback,
+  useEffect,
+} from 'react';
 import {
   View,
   Text,
@@ -16,13 +22,14 @@ import {
   TouchableOpacity,
   Image,
 } from 'react-native';
-import { Camera, useCameraDevice } from 'react-native-vision-camera';
+import {
+  Camera,
+  useCameraDevice,
+  useCameraPermission,
+} from 'react-native-vision-camera';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 
-import CameraGate from '../components/CameraGate';
-import { BackHandler } from 'react-native';
-import { useEffect } from 'react';
-
+/* ================= Constants ================= */
 
 const MAX_PHOTOS = 4;
 
@@ -34,19 +41,26 @@ const CAPTURE_GUIDE = [
 ];
 
 export default function CosmeticRegisterScreen() {
-  const cameraRef = useRef<Camera>(null);
-  const device = useCameraDevice('back');
   const navigation = useNavigation<any>();
+  const cameraRef = useRef<Camera>(null);
+
+  const device = useCameraDevice('back');
+  const { hasPermission, requestPermission } = useCameraPermission();
 
   const [photos, setPhotos] = useState<string[]>([]);
   const isResettingRef = useRef(false);
 
+  /* ================= Permission ================= */
+
+  useEffect(() => {
+    if (!hasPermission) requestPermission();
+  }, [hasPermission, requestPermission]);
+
+  /* ================= Back Handling ================= */
+
   useEffect(() => {
     const unsubscribe = navigation.addListener('beforeRemove', (e) => {
-      // 🔥 이미 우리가 reset 중이면 그냥 통과
-      if (isResettingRef.current) {
-        return;
-      }
+      if (isResettingRef.current) return;
 
       e.preventDefault();
       isResettingRef.current = true;
@@ -67,16 +81,15 @@ export default function CosmeticRegisterScreen() {
     return unsubscribe;
   }, [navigation]);
 
-
-
-  /* ================= 🔥 핵심: 화면 진입 시 무조건 초기화 ================= */
+  /* ================= Focus Reset ================= */
 
   useFocusEffect(
     useCallback(() => {
-      // 🔥 이전 촬영 기록 완전 제거
       setPhotos([]);
     }, [])
   );
+
+  /* ================= Capture ================= */
 
   const currentIndex = photos.length;
   const currentGuide =
@@ -95,6 +108,24 @@ export default function CosmeticRegisterScreen() {
     }
   };
 
+  /* ================= Render ================= */
+
+  if (!hasPermission) {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.permissionText}>
+          카메라 권한이 필요합니다.
+        </Text>
+        <TouchableOpacity
+          style={styles.permissionBtn}
+          onPress={requestPermission}
+        >
+          <Text style={styles.permissionBtnText}>권한 허용</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   if (!device) {
     return (
       <View style={styles.center}>
@@ -104,47 +135,67 @@ export default function CosmeticRegisterScreen() {
   }
 
   return (
-    <CameraGate>
-      <View style={styles.container}>
-        <Camera
-          ref={cameraRef}
-          style={StyleSheet.absoluteFill}
-          device={device}
-          isActive
-          photo
-        />
+    <View style={styles.container}>
+      <Camera
+        ref={cameraRef}
+        style={StyleSheet.absoluteFill}
+        device={device}
+        isActive
+        photo
+      />
 
-        <View style={styles.topOverlay}>
-          <Text style={styles.step}>
-            {currentIndex + 1} / {MAX_PHOTOS}
-          </Text>
-          <Text style={styles.title}>{currentGuide.title}</Text>
-          <Text style={styles.sub}>{currentGuide.desc}</Text>
-        </View>
-
-        {photos.length > 0 && (
-          <View style={styles.thumbnailBox}>
-            <Image
-              source={{ uri: photos[photos.length - 1] }}
-              style={styles.thumbnail}
-            />
-          </View>
-        )}
-
-        <TouchableOpacity
-          style={styles.captureButton}
-          onPress={handleCapture}
-        >
-          <Text style={styles.captureText}>촬영하기</Text>
-        </TouchableOpacity>
+      <View style={styles.topOverlay}>
+        <Text style={styles.step}>
+          {currentIndex + 1} / {MAX_PHOTOS}
+        </Text>
+        <Text style={styles.title}>{currentGuide.title}</Text>
+        <Text style={styles.sub}>{currentGuide.desc}</Text>
       </View>
-    </CameraGate>
+
+      {photos.length > 0 && (
+        <View style={styles.thumbnailBox}>
+          <Image
+            source={{ uri: photos[photos.length - 1] }}
+            style={styles.thumbnail}
+          />
+        </View>
+      )}
+
+      <TouchableOpacity
+        style={styles.captureButton}
+        onPress={handleCapture}
+      >
+        <Text style={styles.captureText}>촬영하기</Text>
+      </TouchableOpacity>
+    </View>
   );
 }
 
+/* ================= Styles ================= */
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  center: {
+    flex: 1,
+    backgroundColor: '#000',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  permissionText: {
+    color: '#FFD400',
+    fontSize: 15,
+    marginBottom: 16,
+  },
+  permissionBtn: {
+    backgroundColor: '#FFD400',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  permissionBtnText: {
+    color: '#000',
+    fontWeight: '700',
+  },
   topOverlay: {
     position: 'absolute',
     top: 0,
