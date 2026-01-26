@@ -30,11 +30,14 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { colors } from '../theme/colors';
 import { getMyCosmeticsApi } from '../api/cosmetic.api';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+import { ImageBackground } from 'react-native';
 
 import PackageIcon from '../assets/packageicon.png';
 import NestClockIcon from '../assets/nestclockicon.png';
 import AlertIcon from '../assets/alerticon.png';
 import CameraIcon from '../assets/cameraicon.png';
+import HeroBanner from '../assets/배너.png';
+
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -124,16 +127,22 @@ export default function HomeScreen() {
       <Text style={styles.title}>ViewLulu</Text>
 
       {/* HERO */}
-      <View style={styles.heroCard}>
+      <ImageBackground
+        source={HeroBanner}
+        style={styles.heroCard}
+        imageStyle={styles.heroImage}
+      >
         <View style={styles.heroOverlay} />
+
         <View style={styles.heroContent}>
-          <Text style={styles.heroTitle}>내 화장품을 한 곳에</Text>
+            <Text style={styles.heroTitle}>나의 눈이 되어주는</Text>
+            <Text style={styles.heroBrand}>뷰루루</Text>
           <Text style={styles.heroDesc}>
-            유통기한과 개봉일을 관리하고{'\n'}
-            안전하게 사용하세요
+            화장을 등록하고{'\n'}
+            내 화장품을 한 곳에 확인하세요!
           </Text>
         </View>
-      </View>
+      </ImageBackground>
 
       {/* 파우치 요약 */}
       <View style={styles.summaryCard}>
@@ -215,25 +224,44 @@ const styles = StyleSheet.create({
   },
 
   heroCard: {
-    height: 220,
+    height: 240,
     borderRadius: 28,
     backgroundColor: '#1A1A1A',
     marginBottom: 24,
     overflow: 'hidden',
+  },
+  heroImage: {
+    resizeMode: 'cover', // 🔥 필수
   },
   heroOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.45)',
   },
   heroContent: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    padding: 24,
+    position: 'absolute',
+      top: 30,  // 🔥 핵심
+      left: 20,
+      right: 20,
   },
   heroTitle: {
-    color: '#FFF',
-    fontSize: 24,
-    fontWeight: '800',
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '700',
+
+    textShadowColor: 'rgba(0,0,0,0.75)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  heroBrand: {
+    color: colors.primary,   // 노란색 강조
+    fontSize: 32,            // 🔥 크게
+    fontWeight: '900',
+
+    textShadowColor: 'rgba(0,0,0,0.9)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+
+    marginTop: 2,
   },
   heroDesc: {
     color: 'rgba(255,255,255,0.75)',

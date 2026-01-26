@@ -10,7 +10,7 @@
  * ✅ 로그인 유지 로직(토큰 삭제 금지) 유지:
  * - 네트워크/일시 실패를 로그아웃으로 처리 ❌
  * - RootNavigator에서 refresh 실패 시 토큰 삭제 ❌
- * - refreshToken이 있으면 Main 진입 유지 (카카오톡처럼)
+ * - refreshToken이 있으면 Main 진입 유지 (카카오톡 방식)
  *
  * ✅ NEW:
  * - RootStack에 CaptureStack 추가 (탭바 밖)
@@ -33,12 +33,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 
-
 import HomeStackNavigator from './HomeStackNavigator';
 import MyPouchStackNavigator from './MyPouchStackNavigator';
 import SettingsStackNavigator from './SettingsStackNavigator';
 import CaptureStackNavigator from './CaptureStackNavigator';
-
 
 import { API_BASE_URL } from '@env';
 
@@ -83,7 +81,7 @@ function MainTabs() {
         name="MyPouchTab"
         component={MyPouchStackNavigator}
         options={({ route }) => {
-          const routeName = getFocusedRouteNameFromRoute(route) ?? 'MyPouch';
+          getFocusedRouteNameFromRoute(route); // 상태 보존 목적
 
           return {
             popToTopOnBlur: true,
@@ -137,7 +135,6 @@ function MainTabs() {
     </Tab.Navigator>
   );
 }
-
 
 /* ================= Root ================= */
 
