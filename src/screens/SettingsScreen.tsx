@@ -98,7 +98,7 @@ export default function SettingsScreen() {
 
       <View style={styles.settingCard}>
         <Text style={styles.settingTitle}>버전</Text>
-        <Text style={styles.settingValue}>v1.0.1</Text>
+        <Text style={styles.settingValue}>v1.0.2</Text>
       </View>
 
       <Text style={styles.sectionTitle}>계정</Text>

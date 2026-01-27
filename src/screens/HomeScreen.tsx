@@ -144,6 +144,35 @@ export default function HomeScreen() {
         </View>
       </ImageBackground>
 
+      {/* 🔍 얼굴 분석 기능 버튼 영역 */}
+      <View style={styles.analysisRow}>
+        {/* 최근 분석 결과 */}
+        <TouchableOpacity
+          style={[styles.analysisBtn, styles.analysisSecondary]}
+          onPress={() =>
+            navigation.navigate('FeatureStack' as never, {
+              screen: 'RecentResult',
+            } as never)
+          }
+        >
+          <Text style={styles.analysisTextSmall}>최근 분석</Text>
+          <Text style={styles.analysisText}>결과 보기</Text>
+        </TouchableOpacity>
+
+        {/* 얼굴형 분석 */}
+        <TouchableOpacity
+          style={[styles.analysisBtn, styles.analysisPrimary]}
+          onPress={() =>
+            navigation.navigate('FeatureStack' as never, {
+              screen: 'FaceAnalysis',
+            } as never)
+          }
+        >
+          <Text style={styles.analysisTextSmall}>AI 얼굴형</Text>
+          <Text style={styles.analysisText}>분석하기</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* 파우치 요약 */}
       <View style={styles.summaryCard}>
         <Text style={styles.summaryTitle}>내 파우치</Text>
@@ -329,4 +358,50 @@ const styles = StyleSheet.create({
     height: 30,
     resizeMode: 'contain',
   },
+  analysisRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 20,
+  },
+
+  analysisBtn: {
+    flex: 1,
+    borderRadius: 22,
+    paddingVertical: 18,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+
+    borderWidth: 1.5,
+    borderColor: '#FFD400',
+
+    // 🔥 노란색 그림자
+    shadowColor: '#FFD400',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+
+    elevation: 6,
+  },
+
+  analysisPrimary: {
+    backgroundColor: '#FFD400',
+  },
+
+  analysisSecondary: {
+    backgroundColor: '#1A1A1A',
+  },
+
+  analysisTextSmall: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#000',
+    opacity: 0.7,
+  },
+
+  analysisText: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#000',
+  },
+
 });

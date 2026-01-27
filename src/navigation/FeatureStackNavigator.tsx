@@ -1,8 +1,7 @@
 /**
- * FeatureStackNavigator (패치 완료본)
+ * FeatureStackNavigator
  * --------------------------------------------------
- * ❌ 화장품 인식/결과 제거
- * ✅ 분석 기능 전용 Stack
+ *
  */
 
 import React from 'react';
@@ -27,13 +26,13 @@ export default function FeatureStackNavigator() {
       <Stack.Screen
         name="FaceAnalysis"
         component={FaceAnalysisScreen}
-        options={{ title: '얼굴형 분석' }}
+        options={{ title: '얼굴형 분석', headerShown: false}}
       />
 
       <Stack.Screen
         name="FaceResult"
         component={FaceResultScreen}
-        options={{ title: '얼굴형 분석 결과' }}
+        options={{ title: '얼굴형 분석 결과', headerShown: false}}
       />
 
       <Stack.Screen
@@ -51,7 +50,7 @@ export default function FeatureStackNavigator() {
       <Stack.Screen
         name="RecentResult"
         component={RecentResultScreen}
-        options={{ title: '최근 분석 결과' }}
+        options={{ title: '최근 분석 결과', headerShown: false }}
       />
     </Stack.Navigator>
   );

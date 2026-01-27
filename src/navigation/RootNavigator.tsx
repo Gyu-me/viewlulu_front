@@ -7,10 +7,11 @@
  * - 다시 MyPouch로 오면 항상 MyPouchScreen부터 시작
  * - Android 시스템 네비게이션 바(Safe Area) 자동 대응
  *
- * ✅ 로그인 유지 로직(토큰 삭제 금지) 유지:
- * - 네트워크/일시 실패를 로그아웃으로 처리 ❌
- * - RootNavigator에서 refresh 실패 시 토큰 삭제 ❌
- * - refreshToken이 있으면 Main 진입 유지 (카카오톡 방식)
+ * ✅ 로그인 유지 로직 (🔥 api.ts 단일 책임):
+ * - RootNavigator에서 auth/refresh 호출 ❌
+ * - refresh 실패 / 네트워크 오류 → 로그아웃 ❌
+ * - refreshToken이 "존재"하면 무조건 MainTabs 진입
+ * - 실제 인증 판단은 api.ts 인터셉터가 전담
  *
  * ✅ NEW:
  * - RootStack에 CaptureStack 추가 (탭바 밖)
@@ -36,9 +37,8 @@ import RegisterScreen from '../screens/RegisterScreen';
 import HomeStackNavigator from './HomeStackNavigator';
 import MyPouchStackNavigator from './MyPouchStackNavigator';
 import SettingsStackNavigator from './SettingsStackNavigator';
+import FeatureStackNavigator from './FeatureStackNavigator';
 import CaptureStackNavigator from './CaptureStackNavigator';
-
-import { API_BASE_URL } from '@env';
 
 const PouchIcon = require('../assets/pouchicon.png');
 const HomeIcon = require('../assets/home.png');
@@ -81,10 +81,22 @@ function MainTabs() {
         name="MyPouchTab"
         component={MyPouchStackNavigator}
         options={({ route }) => {
-          getFocusedRouteNameFromRoute(route); // 상태 보존 목적
+          const routeName =
+            getFocusedRouteNameFromRoute(route) ?? 'MyPouch';
+
+          const hideTabBar = routeName === 'CosmeticDetail';
 
           return {
             popToTopOnBlur: true,
+            tabBarStyle: hideTabBar
+              ? { ...BASE_TAB_STYLE, display: 'none' }
+              : {
+                  ...BASE_TAB_STYLE,
+                  paddingBottom:
+                    BASE_TAB_STYLE.paddingBottom + insets.bottom,
+                  height:
+                    BASE_TAB_STYLE.height + insets.bottom,
+                },
             tabBarIcon: ({ focused }) => (
               <Image
                 source={PouchIcon}
@@ -146,34 +158,18 @@ export default function RootNavigator() {
     let mounted = true;
 
     const bootstrap = async () => {
+      /**
+       * 🔥 RootNavigator의 역할은 단 하나
+       * - "로그인 UI를 보여줄지"만 판단
+       * - 인증 유효성 판단 ❌ (api.ts가 전담)
+       */
       const refreshToken = await AsyncStorage.getItem('refreshToken');
 
-      if (!refreshToken) {
-        mounted && setInitialRoute('Login');
-        return;
-      }
+      if (!mounted) return;
 
-      try {
-        const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refreshToken }),
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          if (data?.accessToken) {
-            await AsyncStorage.setItem('accessToken', data.accessToken);
-          }
-          if (data?.refreshToken) {
-            await AsyncStorage.setItem('refreshToken', data.refreshToken);
-          }
-        }
-      } catch {
-        // ❗ 실패해도 로그아웃 처리하지 않음 (의도된 설계)
-      }
-
-      mounted && setInitialRoute('MainTabs');
+      // ✅ refreshToken이 있으면 무조건 MainTabs
+      // (accessToken 유효성 / 재발급은 api.ts 인터셉터가 처리)
+      setInitialRoute(refreshToken ? 'MainTabs' : 'Login');
     };
 
     bootstrap();
@@ -201,6 +197,11 @@ export default function RootNavigator() {
       <RootStack.Screen
         name="MainTabs"
         component={MainTabs}
+        options={{ headerShown: false }}
+      />
+      <RootStack.Screen
+        name="FeatureStack"
+        component={FeatureStackNavigator}
         options={{ headerShown: false }}
       />
       <RootStack.Screen

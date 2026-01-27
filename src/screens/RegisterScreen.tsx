@@ -36,12 +36,36 @@ export default function RegisterScreen() {
 
   const handleRegister = async () => {
     if (!name || !age || !gender || !email || !password) {
-      Alert.alert('입력 오류', '모든 항목을 입력해주세요.');
+      Alert.alert('입력 확인', '모든 항목을 입력해주세요.');
       return;
     }
 
+    // 이메일 형식 검사
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      Alert.alert(
+        '이메일 확인',
+        '이메일 형식이 올바르지 않습니다.\n예: example@email.com'
+      );
+      return;
+    }
+
+    // 나이 검사
+    const ageNumber = Number(age);
+    if (isNaN(ageNumber) || ageNumber < 1 || ageNumber > 120) {
+      Alert.alert(
+        '나이 확인',
+        '나이는 숫자로 입력해주세요.\n예: 25'
+      );
+      return;
+    }
+
+    // 비밀번호 검사
     if (password.length < 8) {
-      Alert.alert('비밀번호 오류', '비밀번호는 최소 8자 이상이어야 합니다.');
+      Alert.alert(
+        '비밀번호 확인',
+        '비밀번호는 8자 이상이어야 합니다.\n숫자와 문자를 함께 사용하면 더 안전합니다.'
+      );
       return;
     }
 
@@ -52,20 +76,32 @@ export default function RegisterScreen() {
         name,
         email,
         password,
-        age: Number(age),
+        age: ageNumber,
         gender,
       });
 
-      Alert.alert('회원가입 완료', '로그인 화면으로 이동합니다.', [
-        { text: '확인', onPress: () => navigation.goBack() },
-      ]);
+      Alert.alert(
+        '회원가입 완료',
+        '가입이 완료되었습니다.\n로그인 화면으로 이동합니다.',
+        [{ text: '확인', onPress: () => navigation.goBack() }]
+      );
     } catch (err: any) {
-      const message = err?.response?.data?.message ?? '서버 오류';
-      Alert.alert('회원가입 실패', message);
+      const serverMessage = err?.response?.data?.message;
+
+      let message =
+        '회원가입 중 문제가 발생했습니다.\n잠시 후 다시 시도해주세요.';
+
+      if (serverMessage === 'EMAIL_ALREADY_EXISTS') {
+        message =
+          '이미 사용 중인 이메일입니다.\n다른 이메일을 입력해주세요.';
+      }
+
+      Alert.alert('회원가입 안내', message);
     } finally {
       setLoading(false);
     }
   };
+
 
   return (
     <View style={styles.container}>

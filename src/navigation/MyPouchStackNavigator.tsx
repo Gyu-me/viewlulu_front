@@ -24,17 +24,6 @@ export type MyPouchStackParamList = {
 const Stack = createNativeStackNavigator<MyPouchStackParamList>();
 
 export default function MyPouchStackNavigator({ navigation, route }: any) {
-  React.useLayoutEffect(() => {
-    const routeName =
-      getFocusedRouteNameFromRoute(route) ?? 'MyPouch';
-
-    const hideTab =
-      routeName === 'CosmeticDetail';
-
-    navigation.getParent()?.setOptions({
-      tabBarStyle: hideTab ? { display: 'none' } : undefined,
-    });
-  }, [navigation, route]);
 
   return (
     <Stack.Navigator
@@ -44,6 +33,7 @@ export default function MyPouchStackNavigator({ navigation, route }: any) {
         contentStyle: { backgroundColor: '#0A0A0A' },
       }}
     >
+
       <Stack.Screen
         name="MyPouch"
         component={MyPouchScreen}

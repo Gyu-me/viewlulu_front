@@ -8,6 +8,7 @@
  * ✅ CaptureStack 복귀 후 안정적 갱신
  * ✅ 저장 실패 시 기존 목록 유지
  * ✅ 중복 fetch 완전 차단
+ * ✅ 이미지 캐시 최적화 (FastImage 적용)
  */
 
 import React, { useState, useCallback, useRef } from 'react';
@@ -18,7 +19,6 @@ import {
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
-  Image,
   BackHandler,
 } from 'react-native';
 import {
@@ -26,6 +26,8 @@ import {
   useFocusEffect,
 } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+
+import FastImage from 'react-native-fast-image';
 
 import { colors } from '../theme/colors';
 import { getMyCosmeticsApi } from '../api/cosmetic.api';
@@ -40,7 +42,8 @@ type MyPouchItem = {
   thumbnailUrl: string | null;
 };
 
-/* S3 썸네일 처리 */
+/* ================= S3 썸네일 처리 ================= */
+
 const S3_BASE_URL =
   'https://viewlulus3.s3.ap-northeast-2.amazonaws.com';
 
@@ -61,7 +64,8 @@ export default function MyPouchScreen() {
   // 🔒 중복 fetch 방지
   const fetchingRef = useRef(false);
 
-  /* 🔥 Android 뒤로가기 → Home */
+  /* ================= Android 뒤로가기 → Home ================= */
+
   useFocusEffect(
     useCallback(() => {
       const onBackPress = () => {
@@ -81,7 +85,8 @@ export default function MyPouchScreen() {
     }, [navigation])
   );
 
-  /* 🔥 목록 조회 (단일 진입점) */
+  /* ================= 목록 조회 (단일 진입점) ================= */
+
   const fetchMyCosmetics = async () => {
     if (fetchingRef.current) return;
 
@@ -110,28 +115,30 @@ export default function MyPouchScreen() {
     }
   };
 
-  /* ✅ 화면 진입 / 복귀 시만 실행 */
+  /* ================= 화면 진입 / 복귀 시만 실행 ================= */
+
   useFocusEffect(
     useCallback(() => {
       fetchMyCosmetics();
     }, [])
   );
 
-  /* 상세 이동 */
+  /* ================= 네비게이션 ================= */
+
   const goDetail = (groupId: number) => {
     navigation.navigate('CosmeticDetail', {
       cosmeticId: groupId,
     });
   };
 
-  /* 🔥 화장품 등록 (CaptureStack) */
   const goRegister = () => {
     navigation.navigate('CaptureStack' as never, {
       screen: 'CosmeticRegister',
     } as never);
   };
 
-  /* 로딩 */
+  /* ================= Render ================= */
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -140,7 +147,6 @@ export default function MyPouchScreen() {
     );
   }
 
-  /* 에러 */
   if (error) {
     return (
       <View style={styles.center}>
@@ -177,7 +183,15 @@ export default function MyPouchScreen() {
             >
               <View style={styles.thumbWrap}>
                 {uri ? (
-                  <Image source={{ uri }} style={styles.thumb} />
+                  <FastImage
+                    source={{
+                      uri,
+                      priority: FastImage.priority.normal,
+                      cache: FastImage.cacheControl.immutable,
+                    }}
+                    style={styles.thumb}
+                    resizeMode={FastImage.resizeMode.cover}
+                  />
                 ) : (
                   <View style={styles.thumbFallback}>
                     <Text style={styles.thumbFallbackText}>
@@ -195,7 +209,7 @@ export default function MyPouchScreen() {
                   {item.cosmeticName}
                 </Text>
                 <Text style={styles.cardSub}>
-                  등록일:{' '}
+                  등록일 ·{' '}
                   {new Date(item.createdAt).toLocaleDateString()}
                 </Text>
               </View>
