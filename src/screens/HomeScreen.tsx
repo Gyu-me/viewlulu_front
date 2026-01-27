@@ -12,6 +12,7 @@
  * - data가 0개여도 count/over12/over24를 0으로 확정 세팅
  *
  * ✅ UI/UX 변경 없음
+ * ✅ Home 화면에서만 "뷰루루" 음성 호출 활성화
  */
 
 import React, { useState, useCallback } from 'react';
@@ -24,20 +25,31 @@ import {
   BackHandler,
   Alert,
 } from 'react-native';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import {
+  useNavigation,
+  useFocusEffect,
+} from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { ImageBackground } from 'react-native';
 
 import { colors } from '../theme/colors';
 import { getMyCosmeticsApi } from '../api/cosmetic.api';
 import type { RootStackParamList } from '../navigation/RootNavigator';
-import { ImageBackground } from 'react-native';
+import { routeVoiceCommand } from '../voice/voiceCommandRouter';
+import { triggerHotword } from '../voice/hotword';
+
+
+/* 🔊 Hotword */
+import {
+  startHotwordListener,
+  stopHotwordListener,
+} from '../voice/hotword';
 
 import PackageIcon from '../assets/packageicon.png';
 import NestClockIcon from '../assets/nestclockicon.png';
 import AlertIcon from '../assets/alerticon.png';
 import CameraIcon from '../assets/cameraicon.png';
 import HeroBanner from '../assets/배너.png';
-
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -80,12 +92,43 @@ export default function HomeScreen() {
     }, [])
   );
 
+  /* ================= Voice Wake Callback ================= */
+
+  const handleVoiceWake = useCallback(() => {
+    console.log('[Home] Voice Wake Triggered');
+
+    /**
+     * 🔥 여기서 "뷰루루" 호출 후 행동 정의
+     * 예:
+     * - TTS 안내
+     * - 특정 화면 이동
+     * - 음성 명령 모드 진입
+     */
+
+    Alert.alert(
+      '뷰루루 👀',
+      '무엇을 도와드릴까요?',
+      [{ text: '확인' }],
+      { cancelable: true }
+    );
+  }, []);
+
+    /* 🔊 Home 진입 시 Hotword 시작 / 이탈 시 중지 */
+  useFocusEffect(
+    useCallback(() => {
+      startHotwordListener(handleVoiceWake);
+
+      return () => {
+        stopHotwordListener();
+      };
+    }, [handleVoiceWake])
+  );
+
   /* ✅ 포커스 진입 시 요약 데이터 로딩 (정석) */
   const fetchSummary = useCallback(async () => {
     try {
       const data: CosmeticItem[] = await getMyCosmeticsApi();
 
-      // ✅ 0개여도 값을 0으로 확정 (이게 안정화 포인트)
       if (!data || data.length === 0) {
         setCount(0);
         setOver12(0);
@@ -111,8 +154,7 @@ export default function HomeScreen() {
       setOver12(c12);
       setOver24(c24);
     } catch {
-      // UI/UX 변경 없이: 실패 시 값은 그대로 둠
-      // (원하면 여기서 로그만 추가 가능)
+      // UI 변경 없음
     }
   }, []);
 
@@ -133,10 +175,9 @@ export default function HomeScreen() {
         imageStyle={styles.heroImage}
       >
         <View style={styles.heroOverlay} />
-
         <View style={styles.heroContent}>
-            <Text style={styles.heroTitle}>나의 눈이 되어주는</Text>
-            <Text style={styles.heroBrand}>뷰루루</Text>
+          <Text style={styles.heroTitle}>나의 눈이 되어주는</Text>
+          <Text style={styles.heroBrand}>뷰루루</Text>
           <Text style={styles.heroDesc}>
             화장을 등록하고{'\n'}
             내 화장품을 한 곳에 확인하세요!
@@ -144,9 +185,8 @@ export default function HomeScreen() {
         </View>
       </ImageBackground>
 
-      {/* 🔍 얼굴 분석 기능 버튼 영역 */}
+      {/* 얼굴 분석 버튼 */}
       <View style={styles.analysisRow}>
-        {/* 최근 분석 결과 */}
         <TouchableOpacity
           style={[styles.analysisBtn, styles.analysisSecondary]}
           onPress={() =>
@@ -159,7 +199,6 @@ export default function HomeScreen() {
           <Text style={styles.analysisText}>결과 보기</Text>
         </TouchableOpacity>
 
-        {/* 얼굴형 분석 */}
         <TouchableOpacity
           style={[styles.analysisBtn, styles.analysisPrimary]}
           onPress={() =>
@@ -199,7 +238,7 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* 🔥 홈 하단 – 화장품 인식 버튼 */}
+      {/* 하단 Detect */}
       <View style={styles.fabGlow}>
         <TouchableOpacity
           style={styles.fab}
@@ -215,7 +254,23 @@ export default function HomeScreen() {
     </View>
   );
 }
-
+/*====================================*/
+{/* 🔥 [TEST ONLY] 음성 호출 강제 트리거 */}
+<TouchableOpacity
+  onPress={() => triggerHotword()}
+  style={{
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    padding: 10,
+    backgroundColor: 'rgba(255,212,0,0.9)',
+    borderRadius: 8,
+    zIndex: 999,
+  }}
+>
+  <Text style={{ fontWeight: '800' }}>뷰루루 테스트</Text>
+</TouchableOpacity>
+/*====================================*/
 /* 요약 아이템 */
 const SummaryItem = ({
   label,
