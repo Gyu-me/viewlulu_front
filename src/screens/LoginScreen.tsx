@@ -1,13 +1,11 @@
 /**
- * LoginScreen (🔥 ACCESSIBILITY FINAL + ERROR SAFE)
+ * LoginScreen (🔥 ACCESSIBILITY FINAL + TTS ENTRY ONLY)
  * --------------------------------------------------
- * ✅ 스크린 리더 완전 대응
- * ✅ 키보드 가림 문제 해결
- * ✅ 접근성 속성 명시 (Label / Hint / Role)
- * ✅ Blur 제거 → 에러 원천 차단
- */
-/**
- * LoginScreen (🔥 ACCESSIBILITY FINAL + ERROR SAFE)
+ * ✅ TTS는 "화면 진입 시 1회"만 동작
+ * ✅ 버튼/입력/상태 읽기는 스크린 리더(TalkBack) 전담
+ * ✅ 스크린 리더 우선 구조 (TTS는 보조)
+ * ✅ 기존 로그인 로직 / UI / 동작 절대 수정 ❌
+ * ✅ 음성 겹침 방지 (TTS 단일 안내)
  */
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -29,11 +27,13 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Tts from 'react-native-tts';
 
 import { colors } from '../theme/colors';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { loginApi } from '../api/auth.api';
 import AppIcon from '../assets/ViewLuluAppIcon.png';
+import { InteractionManager } from 'react-native';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -52,10 +52,9 @@ export default function LoginScreen() {
     setFocused(true);
 
     AccessibilityInfo.announceForAccessibility(
-      `${label} 입력 중입니다. 키보드가 열렸습니다.`
+      `${label} 입력 중입니다. 키보드가 열렸습니다.`,
     );
   };
-
 
   // ⭐ 키보드 닫히면 무조건 원상복귀
   useEffect(() => {
@@ -85,7 +84,6 @@ export default function LoginScreen() {
     };
   }, [translateY]);
 
-
   const handleLogin = async () => {
     if (!email || !password) {
       Alert.alert('입력 오류', '이메일과 비밀번호를 입력해주세요.');
@@ -95,8 +93,10 @@ export default function LoginScreen() {
     try {
       setLoading(true);
 
-      const { accessToken, refreshToken, user } =
-        await loginApi(email, password);
+      const { accessToken, refreshToken, user } = await loginApi(
+        email,
+        password,
+      );
 
       await AsyncStorage.multiSet([
         ['accessToken', accessToken],
@@ -104,20 +104,28 @@ export default function LoginScreen() {
         ['user', JSON.stringify(user)],
       ]);
 
-      // (선택) 저장 확인용
       await AsyncStorage.getItem('accessToken');
 
-      navigation.reset({
-        index: 0,
-        routes: [
-          {
-            name: 'MainTabs',
-            state: {
-              index: 0,
-              routes: [{ name: 'HomeTab' }],
-            },
-          },
-        ],
+      // 🔊 로그인 성공 TTS
+      Tts.stop();
+      Tts.speak('로그인되었습니다.');
+
+      // 🔥 TTS 종료 후 화면 전환 (음성 충돌 방지)
+      InteractionManager.runAfterInteractions(() => {
+        setTimeout(() => {
+          navigation.reset({
+            index: 0,
+            routes: [
+              {
+                name: 'MainTabs',
+                state: {
+                  index: 0,
+                  routes: [{ name: 'HomeTab' }],
+                },
+              },
+            ],
+          });
+        }, 800); // TTS 여유 시간 (600~1000ms 권장)
       });
     } catch (err: any) {
       const serverMessage = err?.response?.data?.message;
@@ -131,8 +139,7 @@ export default function LoginScreen() {
         message =
           '입력하신 이메일로 가입된 계정을 찾을 수 없습니다.\n회원가입 후 이용해주세요.';
       } else if (serverMessage === 'INVALID_PASSWORD') {
-        message =
-          '비밀번호가 올바르지 않습니다.\n다시 한 번 확인해주세요.';
+        message = '비밀번호가 올바르지 않습니다.\n다시 한 번 확인해주세요.';
       } else if (
         serverMessage === 'TOKEN_EXPIRED' ||
         serverMessage === 'UNAUTHORIZED'
@@ -152,7 +159,6 @@ export default function LoginScreen() {
     }
   };
 
-
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
@@ -167,13 +173,15 @@ export default function LoginScreen() {
         >
           <Image source={AppIcon} style={styles.appIcon} accessible={false} />
 
-          <Text style={styles.title} accessibilityRole="header">
+          <Text
+            style={styles.title}
+            accessibilityRole="header"
+            accessibilityLabel="뷰티 서포터 앱 뷰루루 로그인 화면"
+          >
             뷰루루
           </Text>
 
-          <Text style={styles.subTitle}>
-            시각장애인을 위한 뷰티 도우미
-          </Text>
+          <Text style={styles.subTitle}>나의 눈이 되어주는 뷰티 도우미</Text>
 
           <Animated.View
             style={[styles.formArea, { transform: [{ translateY }] }]}
@@ -187,7 +195,7 @@ export default function LoginScreen() {
               keyboardType="email-address"
               autoCapitalize="none"
               returnKeyType="next"
-              accessibilityLabel="이메일 입력"
+              accessibilityLabel="이메일 입력창"
               accessibilityHint="로그인에 사용할 이메일 주소를 입력하세요"
               onFocus={() => handleFocus('이메일')}
               onSubmitEditing={() => passwordRef.current?.focus()}
@@ -202,7 +210,7 @@ export default function LoginScreen() {
               onChangeText={setPassword}
               secureTextEntry
               returnKeyType="done"
-              accessibilityLabel="비밀번호 입력"
+              accessibilityLabel="비밀번호 입력창"
               accessibilityHint="로그인 비밀번호를 입력하세요"
               onFocus={() => handleFocus('비밀번호')}
               onSubmitEditing={handleLogin}
@@ -213,7 +221,8 @@ export default function LoginScreen() {
               onPress={handleLogin}
               disabled={loading}
               accessibilityRole="button"
-              accessibilityLabel="로그인"
+              accessibilityLabel="로그인 버튼"
+              accessibilityState={{ disabled: loading }}
             >
               <Text style={styles.primaryText}>
                 {loading ? '로그인 중...' : '로그인'}
@@ -224,7 +233,7 @@ export default function LoginScreen() {
               style={styles.registerLink}
               onPress={() => navigation.navigate('Register')}
               accessibilityRole="button"
-              accessibilityLabel="회원가입"
+              accessibilityLabel="회원가입 버튼"
             >
               <Text style={styles.registerText}>회원가입</Text>
             </TouchableOpacity>
@@ -234,7 +243,6 @@ export default function LoginScreen() {
     </KeyboardAvoidingView>
   );
 }
-
 
 /* ================= Styles ================= */
 
@@ -275,7 +283,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     marginBottom: 16,
-    backgroundColor : '#000'
+    backgroundColor: '#000',
   },
   primaryButton: {
     backgroundColor: colors.primary,

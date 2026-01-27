@@ -23,6 +23,8 @@ class FaceShapeTfliteModule(reactContext: ReactApplicationContext) :
     @ReactMethod
     fun predict(imagePath: String, promise: Promise) {
         try {
+            val TEST_MODE = "ones"  // "zeros" or "ones" or "off"
+
             Log.d("FaceShape", "🔥 predict() called")
             Log.d("FaceShape", "imagePath(raw) = $imagePath")
 
@@ -84,12 +86,25 @@ class FaceShapeTfliteModule(reactContext: ReactApplicationContext) :
                 Log.d("FaceShape", "pixel[$i] RGB = $r, $g, $b")
             }
 
-            // ✅ (현재 전처리) 0~1 스케일
-            for (p in pixels) {
-                input.putFloat((((p shr 16) and 0xFF) / 127.5f) - 1f)
-                input.putFloat((((p shr 8) and 0xFF) / 127.5f) - 1f)
-                input.putFloat(((p and 0xFF) / 127.5f) - 1f)
+            if (TEST_MODE == "zeros") {
+                // 입력을 전부 0으로
+                for (i in 0 until (inputSize * inputSize * 3)) {
+                    input.putFloat(0f)
+                }
+            } else if (TEST_MODE == "ones") {
+                // 입력을 전부 1로
+                for (i in 0 until (inputSize * inputSize * 3)) {
+                    input.putFloat(1f)
+                }
+            } else {
+                // 원래 이미지 전처리 (-1~1)
+                for (p in pixels) {
+                    input.putFloat((((p shr 16) and 0xFF) / 127.5f) - 1f)
+                    input.putFloat((((p shr 8) and 0xFF) / 127.5f) - 1f)
+                    input.putFloat(((p and 0xFF) / 127.5f) - 1f)
+                }
             }
+
 
 
             // ✅ 입력 텐서 샘플 (전처리 검증)
