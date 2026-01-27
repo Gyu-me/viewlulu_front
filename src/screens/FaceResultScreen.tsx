@@ -113,64 +113,67 @@ export default function FaceResultScreen() {
    * ✅ [추가] analysis 모드에서만: photoPath로 추론 1회 수행 → Top2 반영
    * - 원본 버튼/네비/화면 구조는 그대로
    * ========================================================= */
-useEffect(() => {
-  if (!photoPath) return;
-  if (isReadOnly) return;
+  useEffect(() => {
+    if (!photoPath) return;
+    if (isReadOnly) return;
 
-  const run = async () => {
-    try {
-      // ✅ [추가] 호출 여부/값 확인용 로그 (기능 영향 없음)
-      console.log('[FaceShape] photoPath(raw)=', photoPath);
-      console.log('[FaceShape] module exists=', !!FaceShapeTflite);
-      console.log('[FaceShape] predict typeof=', typeof FaceShapeTflite?.predict);
+    const run = async () => {
+      try {
+        // ✅ [추가] 호출 여부/값 확인용 로그 (기능 영향 없음)
+        console.log('[FaceShape] photoPath(raw)=', photoPath);
+        console.log('[FaceShape] module exists=', !!FaceShapeTflite);
+        console.log(
+          '[FaceShape] predict typeof=',
+          typeof FaceShapeTflite?.predict,
+        );
 
-      // ✅ [추가] 네이티브로 넘길 경로를 file:// 로 통일 (안전)
-      const uri =
-        photoPath.startsWith('file://') ? photoPath : `file://${photoPath}`;
-      console.log('[FaceShape] photoPath(uri)=', uri);
-      console.log('[FaceShape] calling native predict...');
+        // ✅ [추가] 네이티브로 넘길 경로를 file:// 로 통일 (안전)
+        const uri = photoPath.startsWith('file://')
+          ? photoPath
+          : `file://${photoPath}`;
+        console.log('[FaceShape] photoPath(uri)=', uri);
+        console.log('[FaceShape] calling native predict...');
 
-      // ✅ 네이티브 모듈로부터 5개 확률 받기 (softmax)
-      const probs: number[] = await FaceShapeTflite.predict(uri);
-      console.log('[FaceShape] probs=', probs);
+        // ✅ 네이티브 모듈로부터 5개 확률 받기 (softmax)
+        const probs: number[] = await FaceShapeTflite.predict(uri);
+        console.log('[FaceShape] probs=', probs);
 
-      // ✅ (안전) 길이 부족/오류 대비
-      if (!Array.isArray(probs) || probs.length < 5) {
-        throw new Error('Invalid probs from native module');
+        // ✅ (안전) 길이 부족/오류 대비
+        if (!Array.isArray(probs) || probs.length < 5) {
+          throw new Error('Invalid probs from native module');
+        }
+
+        // ✅ 클래스별 확률 묶기
+        const items = CLASS_ORDER.map((cls, idx) => ({
+          cls,
+          prob: probs[idx] ?? 0,
+        }));
+
+        // ✅ Top-2 정렬
+        items.sort((a, b) => b.prob - a.prob);
+        const top2 = items.slice(0, 2);
+
+        // ✅ 화면에 표시할 형태로 변환
+        const next: ResultItem[] = top2.map(({ cls, prob }) => {
+          const meta = (FACE_META as any)[cls];
+          return {
+            label: meta?.label ?? String(cls),
+            percent: Math.round(prob * 100),
+            desc: meta?.desc ?? '얼굴형 특징 설명을 준비 중입니다.',
+          };
+        });
+
+        setResults(next);
+      } catch (e) {
+        // ✅ [추가] 에러를 문자열로도 찍어보기 (네이티브 reject 내용 확인)
+        console.log('[FaceShape] inference error=', String(e));
+        console.log('FaceShape inference error:', e);
+        // 실패 시에도 화면이 깨지지 않도록 기존 “분석 중” 상태 유지
       }
+    };
 
-      // ✅ 클래스별 확률 묶기
-      const items = CLASS_ORDER.map((cls, idx) => ({
-        cls,
-        prob: probs[idx] ?? 0,
-      }));
-
-      // ✅ Top-2 정렬
-      items.sort((a, b) => b.prob - a.prob);
-      const top2 = items.slice(0, 2);
-
-      // ✅ 화면에 표시할 형태로 변환
-      const next: ResultItem[] = top2.map(({ cls, prob }) => {
-        const meta = (FACE_META as any)[cls];
-        return {
-          label: meta?.label ?? String(cls),
-          percent: Math.round(prob * 100),
-          desc: meta?.desc ?? '얼굴형 특징 설명을 준비 중입니다.',
-        };
-      });
-
-      setResults(next);
-    } catch (e) {
-      // ✅ [추가] 에러를 문자열로도 찍어보기 (네이티브 reject 내용 확인)
-      console.log('[FaceShape] inference error=', String(e));
-      console.log('FaceShape inference error:', e);
-      // 실패 시에도 화면이 깨지지 않도록 기존 “분석 중” 상태 유지
-    }
-  };
-
-  run();
-}, [photoPath, isReadOnly, CLASS_ORDER, FACE_META]);
-
+    run();
+  }, [photoPath, isReadOnly, CLASS_ORDER, FACE_META]);
 
   /** 홈으로 돌아가기 (원본 유지) */
   const goHome = () => {
@@ -180,11 +183,9 @@ useEffect(() => {
         params: {
           screen: 'HomeTab',
         },
-      })
+      }),
     );
   };
-
-
 
   const handleSave = async () => {
     try {
@@ -204,11 +205,10 @@ useEffect(() => {
       console.log('[FaceResult] save error', e);
       Alert.alert(
         '저장 실패',
-        '결과 저장에 실패했습니다. 잠시 후 다시 시도해주세요.'
+        '결과 저장에 실패했습니다. 잠시 후 다시 시도해주세요.',
       );
     }
   };
-
 
   return (
     <ScrollView
@@ -240,7 +240,12 @@ useEffect(() => {
 
       {/* ✅ Top-2 결과 카드 표시 (원본 ResultCard 컴포넌트 그대로 활용) */}
       {results.map((r, idx) => (
-        <ResultCard key={idx} label={r.label} percent={r.percent} desc={r.desc} />
+        <ResultCard
+          key={idx}
+          label={r.label}
+          percent={r.percent}
+          desc={r.desc}
+        />
       ))}
 
       {/* 액션 버튼 (원본 유지) */}
@@ -255,7 +260,6 @@ useEffect(() => {
           <Text style={styles.secondaryText}>홈으로 돌아가기</Text>
         </TouchableOpacity>
       </View>
-
     </ScrollView>
   );
 }
@@ -366,7 +370,6 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     gap: 14,
   },
-
 
   primaryButton: {
     backgroundColor: '#FFD400',

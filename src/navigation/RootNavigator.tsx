@@ -44,6 +44,15 @@ const PouchIcon = require('../assets/pouchicon.png');
 const HomeIcon = require('../assets/home.png');
 const SettingsIcon = require('../assets/settings.png');
 
+// 🔹 Root Stack Param List (Navigation Type Safety)
+export type RootStackParamList = {
+  Login: undefined;
+  Register: undefined;
+  MainTabs: undefined;
+  FeatureStack: undefined;
+  CaptureStack: undefined;
+};
+
 const RootStack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
@@ -81,8 +90,7 @@ function MainTabs() {
         name="MyPouchTab"
         component={MyPouchStackNavigator}
         options={({ route }) => {
-          const routeName =
-            getFocusedRouteNameFromRoute(route) ?? 'MyPouch';
+          const routeName = getFocusedRouteNameFromRoute(route) ?? 'MyPouch';
 
           const hideTabBar = routeName === 'CosmeticDetail';
 
@@ -92,10 +100,8 @@ function MainTabs() {
               ? { ...BASE_TAB_STYLE, display: 'none' }
               : {
                   ...BASE_TAB_STYLE,
-                  paddingBottom:
-                    BASE_TAB_STYLE.paddingBottom + insets.bottom,
-                  height:
-                    BASE_TAB_STYLE.height + insets.bottom,
+                  paddingBottom: BASE_TAB_STYLE.paddingBottom + insets.bottom,
+                  height: BASE_TAB_STYLE.height + insets.bottom,
                 },
             tabBarIcon: ({ focused }) => (
               <Image
@@ -151,8 +157,9 @@ function MainTabs() {
 /* ================= Root ================= */
 
 export default function RootNavigator() {
-  const [initialRoute, setInitialRoute] =
-    useState<'Login' | 'MainTabs' | null>(null);
+  const [initialRoute, setInitialRoute] = useState<'Login' | 'MainTabs' | null>(
+    null,
+  );
 
   useEffect(() => {
     let mounted = true;

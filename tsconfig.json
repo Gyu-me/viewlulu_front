@@ -1,5 +1,18 @@
 {
   "extends": "@react-native/typescript-config",
+
+  "compilerOptions": {
+    /* RN 관대 모드 핵심 옵션 */
+    "strict": false,
+    "skipLibCheck": true,
+    "noImplicitAny": false,
+
+    /* RN 환경 안정화 */
+    "jsx": "react-native",
+    "allowJs": true,
+    "isolatedModules": true
+  },
+
   "include": ["**/*.ts", "**/*.tsx"],
   "exclude": ["**/node_modules", "**/Pods"]
 }
