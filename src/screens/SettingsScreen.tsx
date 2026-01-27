@@ -6,9 +6,10 @@
  * - ✅ 사용자 명시 동작에서만 로그아웃
  * - ✅ 서버 로그아웃 + 로컬 토큰 제거 + 네비게이션 reset
  * - ✅ Android 뒤로가기 → Home 이동
+ * - ✅ "뷰루루" 음성 호출 기능 On / Off 설정 (AsyncStorage 저장)
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -17,6 +18,7 @@ import {
   TouchableOpacity,
   Alert,
   BackHandler,
+  Switch,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -27,15 +29,37 @@ import {
 import { colors } from '../theme/colors';
 import { api } from '../api/api';
 
+const VOICE_WAKE_KEY = 'voiceWakeEnabled';
+
 export default function SettingsScreen() {
   const navigation = useNavigation<any>();
 
-  /* 🔥 Android 뒤로가기 → Home으로 이동 */
+  /* ================= Voice Wake Toggle ================= */
+
+  const [voiceWakeEnabled, setVoiceWakeEnabled] = useState(false);
+
+  useEffect(() => {
+    const loadSetting = async () => {
+      const saved = await AsyncStorage.getItem(VOICE_WAKE_KEY);
+      if (saved !== null) {
+        setVoiceWakeEnabled(saved === 'true');
+      }
+    };
+    loadSetting();
+  }, []);
+
+  const toggleVoiceWake = async (value: boolean) => {
+    setVoiceWakeEnabled(value);
+    await AsyncStorage.setItem(VOICE_WAKE_KEY, String(value));
+  };
+
+  /* ================= Android Back ================= */
+
   useFocusEffect(
     useCallback(() => {
       const onBackPress = () => {
         navigation.navigate('Home');
-        return true; // 기본 앱 종료 차단
+        return true; // 기본 종료 차단
       };
 
       const subscription = BackHandler.addEventListener(
@@ -44,10 +68,12 @@ export default function SettingsScreen() {
       );
 
       return () => {
-        subscription.remove(); // ✅ 최신 RN 방식
+        subscription.remove();
       };
     }, [navigation])
   );
+
+  /* ================= Logout ================= */
 
   const handleLogout = () => {
     Alert.alert(
@@ -86,6 +112,8 @@ export default function SettingsScreen() {
     );
   };
 
+  /* ================= Render ================= */
+
   return (
     <ScrollView
       style={styles.container}
@@ -94,6 +122,24 @@ export default function SettingsScreen() {
     >
       <Text style={styles.title}>설정</Text>
 
+      {/* ================= Voice Wake ================= */}
+      <Text style={styles.sectionTitle}>음성 기능</Text>
+
+      <View style={styles.settingRow}>
+        <Text style={styles.settingTitle}>“뷰루루” 음성 호출</Text>
+        <Switch
+          value={voiceWakeEnabled}
+          onValueChange={toggleVoiceWake}
+          trackColor={{ false: '#444', true: colors.primary }}
+          thumbColor="#000"
+        />
+      </View>
+
+      <Text style={styles.settingDesc}>
+        앱 사용 중 “뷰루루”라고 말하면 음성 기능이 실행됩니다.
+      </Text>
+
+      {/* ================= App Info ================= */}
       <Text style={styles.sectionTitle}>앱 정보</Text>
 
       <View style={styles.settingCard}>
@@ -101,6 +147,7 @@ export default function SettingsScreen() {
         <Text style={styles.settingValue}>v1.0.2</Text>
       </View>
 
+      {/* ================= Account ================= */}
       <Text style={styles.sectionTitle}>계정</Text>
 
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
@@ -110,7 +157,7 @@ export default function SettingsScreen() {
   );
 }
 
-/* ================= 스타일 ================= */
+/* ================= Styles ================= */
 
 const styles = StyleSheet.create({
   container: {
@@ -132,7 +179,7 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontSize: 18,
     fontWeight: '700',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   settingCard: {
     borderWidth: 2,
@@ -141,16 +188,31 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 16,
   },
+  settingRow: {
+    borderWidth: 2,
+    borderColor: colors.primary,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   settingTitle: {
     color: colors.primary,
     fontSize: 16,
     fontWeight: '700',
-    marginBottom: 4,
   },
   settingValue: {
     color: colors.primary,
     fontSize: 16,
     fontWeight: '700',
+  },
+  settingDesc: {
+    color: '#AAA',
+    fontSize: 13,
+    marginBottom: 20,
+    paddingHorizontal: 4,
   },
   logoutButton: {
     borderWidth: 2,
