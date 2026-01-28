@@ -193,14 +193,8 @@ export default function RootNavigator() {
     );
   }
 
-  return (
-    <RootStack.Navigator initialRouteName={initialRoute}>
-      <RootStack.Screen
-        name="Login"
-        component={LoginScreen}
-        options={{ headerShown: false }}
-      />
-      <RootStack.Screen name="Register" component={RegisterScreen} />
+  return initialRoute === 'MainTabs' ? (
+    <RootStack.Navigator>
       <RootStack.Screen
         name="MainTabs"
         component={MainTabs}
@@ -216,6 +210,15 @@ export default function RootNavigator() {
         component={CaptureStackNavigator}
         options={{ headerShown: false }}
       />
+    </RootStack.Navigator>
+  ) : (
+    <RootStack.Navigator>
+      <RootStack.Screen
+        name="Login"
+        component={LoginScreen}
+        options={{ headerShown: false }}
+      />
+      <RootStack.Screen name="Register" component={RegisterScreen} />
     </RootStack.Navigator>
   );
 }
