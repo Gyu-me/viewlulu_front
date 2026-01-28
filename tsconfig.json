@@ -3,6 +3,7 @@
 
   "compilerOptions": {
     /* RN 관대 모드 핵심 옵션 */
+    "noEmit": true,
     "strict": false,
     "skipLibCheck": true,
     "noImplicitAny": false,

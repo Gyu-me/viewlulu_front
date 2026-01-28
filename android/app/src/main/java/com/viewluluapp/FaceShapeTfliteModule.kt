@@ -36,7 +36,7 @@ class FaceShapeTfliteModule(reactContext: ReactApplicationContext) :
 
             // 1) 모델 로드 (1번만)
             if (interpreter == null) {
-                val modelBuffer = loadModelFile(reactApplicationContext, "faceshape_214_fixed.tflite")
+                val modelBuffer = loadModelFile(reactApplicationContext, "faceshape_float32.tflite")
 
                 Log.i("FaceShape", "TFLite runtime version = ${TensorFlowLite.runtimeVersion()}")
                 Log.i("FaceShape", "TFLite schema version = ${TensorFlowLite.schemaVersion()}")

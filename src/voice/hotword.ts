@@ -2,18 +2,20 @@
  * hotword.ts (🔥 REAL FINAL STABLE)
  * --------------------------------------------------
  * - "뷰루루" 음성 호출(Hotword) 전용 컨트롤러
- * - 실제 음성 인식 엔진은 추후 주입
+ * - HomeScreen에서만 활성화
  *
  * 책임:
  * - 음성 호출 활성화 / 비활성화
  * - 현재 실행 상태 관리
- * - Home 화면에서만 안전하게 동작
+ * - "뷰루루" 감지 시 단일 콜백 트리거
  *
- * ❗ 이 파일은 "엔진 독립"
+ * ❗ 엔진 독립 구조
  * ❗ Android / iOS / Whisper / Porcupine 교체 가능
+ * ❗ 현재는 @react-native-voice/voice 기반 최소 동작 엔진 사용
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Voice from '@react-native-voice/voice';
 
 const VOICE_WAKE_KEY = 'voiceWakeEnabled';
 
@@ -23,20 +25,17 @@ type HotwordCallback = () => void;
 
 /* ================= Internal State ================= */
 
-/**
- * 현재 리스너 실행 여부
- */
+/** 현재 Hotword 리스너 실행 여부 */
 let isRunning = false;
 
-/**
- * "뷰루루" 감지 시 실행할 콜백
- */
+/** "뷰루루" 감지 시 실행할 콜백 */
 let onWakeCallback: HotwordCallback | null = null;
 
 /* ================= Utils ================= */
 
 /**
  * 설정에서 음성 호출 활성화 여부 확인
+ * - 기본값: false
  */
 const isWakeEnabled = async (): Promise<boolean> => {
   try {
@@ -54,10 +53,8 @@ const isWakeEnabled = async (): Promise<boolean> => {
  * - HomeScreen 진입 시 호출
  * - 설정 OFF 상태면 아무 동작도 하지 않음
  */
-export const startHotwordListener = async (
-  onWake: HotwordCallback
-) => {
-  // 이미 실행 중이면 무시
+export const startHotwordListener = async (onWake: HotwordCallback) => {
+  // 중복 실행 방지
   if (isRunning) {
     console.log('[Hotword] already running');
     return;
@@ -75,13 +72,31 @@ export const startHotwordListener = async (
   console.log('[Hotword] started');
 
   /**
-   * 🔥 실제 음성 인식 엔진 start 위치
-   *
-   * 예:
-   * - SpeechRecognizer.startListening()
-   * - Voice.start()
-   * - Whisper stream start
+   * 🔥 실제 음성 인식 엔진 연결부
+   * - 이 부분만 교체하면 엔진 변경 가능
    */
+
+  Voice.onSpeechResults = event => {
+    const results = event.value ?? [];
+    console.log('[Hotword] speech results:', results);
+
+    // "뷰루루" 포함 여부 확인
+    const detected = results.some(text => text.includes('뷰루루'));
+
+    if (detected) {
+      triggerHotword();
+    }
+  };
+
+  Voice.onSpeechError = error => {
+    console.warn('[Hotword] speech error:', error);
+  };
+
+  try {
+    await Voice.start('ko-KR');
+  } catch (e) {
+    console.warn('[Hotword] voice start failed:', e);
+  }
 };
 
 /**
@@ -98,17 +113,14 @@ export const stopHotwordListener = () => {
   onWakeCallback = null;
 
   /**
-   * 🔥 실제 음성 인식 엔진 stop 위치
-   *
-   * 예:
-   * - SpeechRecognizer.stopListening()
-   * - Voice.stop()
-   * - Whisper stream close
+   * 🔥 엔진 stop / 정리
    */
+  Voice.stop();
+  Voice.destroy();
 };
 
 /**
- * 🚨 엔진이 "뷰루루" 감지했을 때 호출
+ * 🚨 "뷰루루" 감지 시 단일 진입점
  * - 실제 엔진에서는 이 함수만 호출하면 됨
  */
 export const triggerHotword = () => {

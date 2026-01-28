@@ -25,10 +25,7 @@ import {
   BackHandler,
   Alert,
 } from 'react-native';
-import {
-  useNavigation,
-  useFocusEffect,
-} from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { ImageBackground } from 'react-native';
 
@@ -38,12 +35,8 @@ import type { RootStackParamList } from '../navigation/RootNavigator';
 import { routeVoiceCommand } from '../voice/voiceCommandRouter';
 import { triggerHotword } from '../voice/hotword';
 
-
 /* 🔊 Hotword */
-import {
-  startHotwordListener,
-  stopHotwordListener,
-} from '../voice/hotword';
+import { startHotwordListener, stopHotwordListener } from '../voice/hotword';
 
 import PackageIcon from '../assets/packageicon.png';
 import NestClockIcon from '../assets/nestclockicon.png';
@@ -76,20 +69,20 @@ export default function HomeScreen() {
             { text: '취소', style: 'cancel' },
             { text: '종료', onPress: () => BackHandler.exitApp() },
           ],
-          { cancelable: true }
+          { cancelable: true },
         );
         return true;
       };
 
       const subscription = BackHandler.addEventListener(
         'hardwareBackPress',
-        onBackPress
+        onBackPress,
       );
 
       return () => {
         subscription.remove();
       };
-    }, [])
+    }, []),
   );
 
   /* ================= Voice Wake Callback ================= */
@@ -105,15 +98,12 @@ export default function HomeScreen() {
      * - 음성 명령 모드 진입
      */
 
-    Alert.alert(
-      '뷰루루 👀',
-      '무엇을 도와드릴까요?',
-      [{ text: '확인' }],
-      { cancelable: true }
-    );
+    Alert.alert('뷰루루 👀', '무엇을 도와드릴까요?', [{ text: '확인' }], {
+      cancelable: true,
+    });
   }, []);
 
-    /* 🔊 Home 진입 시 Hotword 시작 / 이탈 시 중지 */
+  /* 🔊 Home 진입 시 Hotword 시작 / 이탈 시 중지 */
   useFocusEffect(
     useCallback(() => {
       startHotwordListener(handleVoiceWake);
@@ -121,7 +111,7 @@ export default function HomeScreen() {
       return () => {
         stopHotwordListener();
       };
-    }, [handleVoiceWake])
+    }, [handleVoiceWake]),
   );
 
   /* ✅ 포커스 진입 시 요약 데이터 로딩 (정석) */
@@ -161,7 +151,7 @@ export default function HomeScreen() {
   useFocusEffect(
     useCallback(() => {
       fetchSummary();
-    }, [fetchSummary])
+    }, [fetchSummary]),
   );
 
   return (
@@ -179,8 +169,7 @@ export default function HomeScreen() {
           <Text style={styles.heroTitle}>나의 눈이 되어주는</Text>
           <Text style={styles.heroBrand}>뷰루루</Text>
           <Text style={styles.heroDesc}>
-            화장을 등록하고{'\n'}
-            내 화장품을 한 곳에 확인하세요!
+            화장을 등록하고{'\n'}내 화장품을 한 곳에 확인하세요!
           </Text>
         </View>
       </ImageBackground>
@@ -190,9 +179,12 @@ export default function HomeScreen() {
         <TouchableOpacity
           style={[styles.analysisBtn, styles.analysisSecondary]}
           onPress={() =>
-            navigation.navigate('FeatureStack' as never, {
-              screen: 'RecentResult',
-            } as never)
+            navigation.navigate(
+              'FeatureStack' as never,
+              {
+                screen: 'RecentResult',
+              } as never,
+            )
           }
         >
           <Text style={styles.analysisTextSmall}>최근 분석</Text>
@@ -202,9 +194,12 @@ export default function HomeScreen() {
         <TouchableOpacity
           style={[styles.analysisBtn, styles.analysisPrimary]}
           onPress={() =>
-            navigation.navigate('FeatureStack' as never, {
-              screen: 'FaceAnalysis',
-            } as never)
+            navigation.navigate(
+              'FeatureStack' as never,
+              {
+                screen: 'FaceAnalysis',
+              } as never,
+            )
           }
         >
           <Text style={styles.analysisTextSmall}>AI 얼굴형</Text>
@@ -251,25 +246,25 @@ export default function HomeScreen() {
           <Image source={CameraIcon} style={styles.fabIcon} />
         </TouchableOpacity>
       </View>
+      {/* 🔥 [TEST ONLY] 음성 호출 강제 트리거 */}
+      <TouchableOpacity
+        onPress={() => triggerHotword()}
+        style={{
+          position: 'absolute',
+          top: 10,
+          right: 10,
+          padding: 10,
+          backgroundColor: 'rgba(255,212,0,0.9)',
+          borderRadius: 8,
+          zIndex: 999,
+        }}
+      >
+        <Text style={{ fontWeight: '800' }}>뷰루루 테스트</Text>
+      </TouchableOpacity>
     </View>
   );
 }
-/*====================================*/
-{/* 🔥 [TEST ONLY] 음성 호출 강제 트리거 */}
-<TouchableOpacity
-  onPress={() => triggerHotword()}
-  style={{
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    padding: 10,
-    backgroundColor: 'rgba(255,212,0,0.9)',
-    borderRadius: 8,
-    zIndex: 999,
-  }}
->
-  <Text style={{ fontWeight: '800' }}>뷰루루 테스트</Text>
-</TouchableOpacity>
+
 /*====================================*/
 /* 요약 아이템 */
 const SummaryItem = ({
@@ -323,9 +318,9 @@ const styles = StyleSheet.create({
   },
   heroContent: {
     position: 'absolute',
-      top: 30,  // 🔥 핵심
-      left: 20,
-      right: 20,
+    top: 30, // 🔥 핵심
+    left: 20,
+    right: 20,
   },
   heroTitle: {
     color: '#FFFFFF',
@@ -337,8 +332,8 @@ const styles = StyleSheet.create({
     textShadowRadius: 3,
   },
   heroBrand: {
-    color: colors.primary,   // 노란색 강조
-    fontSize: 32,            // 🔥 크게
+    color: colors.primary, // 노란색 강조
+    fontSize: 32, // 🔥 크게
     fontWeight: '900',
 
     textShadowColor: 'rgba(0,0,0,0.9)',
@@ -458,5 +453,4 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#000',
   },
-
 });
