@@ -53,26 +53,6 @@ export default function CosmeticEditScreen() {
   const [name, setName] = useState('');
   const [purchaseDate, setPurchaseDate] = useState('');
 
-  /* ================= 하단 탭바 숨김 ================= */
-  useFocusEffect(
-    useCallback(() => {
-      // ✅ Detail 화면과 동일하게 하단 탭바 숨김
-      navigation.getParent()?.setOptions({
-        tabBarStyle: { display: 'none' },
-      });
-
-      return () => {
-        // ✅ Edit 화면을 벗어나면 다시 복구
-        navigation.getParent()?.setOptions({
-          tabBarStyle: {
-            backgroundColor: '#000',
-            borderTopColor: '#222',
-          },
-        });
-      };
-    }, [navigation]),
-  );
-
   /* ================= Fetch ================= */
 
   useEffect(() => {

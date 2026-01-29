@@ -21,10 +21,7 @@ import {
   ActivityIndicator,
   BackHandler,
 } from 'react-native';
-import {
-  useNavigation,
-  useFocusEffect,
-} from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import FastImage from 'react-native-fast-image';
@@ -44,8 +41,7 @@ type MyPouchItem = {
 
 /* ================= S3 썸네일 처리 ================= */
 
-const S3_BASE_URL =
-  'https://viewlulus3.s3.ap-northeast-2.amazonaws.com';
+const S3_BASE_URL = 'https://viewlulus3.s3.ap-northeast-2.amazonaws.com';
 
 const toImageUrl = (keyOrUrl?: string | null) => {
   if (!keyOrUrl) return null;
@@ -71,18 +67,26 @@ export default function MyPouchScreen() {
       const onBackPress = () => {
         navigation.getParent()?.reset({
           index: 0,
-          routes: [{ name: 'Home' }],
+          routes: [
+            {
+              name: 'MainTabs',
+              state: {
+                index: 0,
+                routes: [{ name: 'HomeTab' }],
+              },
+            },
+          ],
         });
         return true;
       };
 
       const sub = BackHandler.addEventListener(
         'hardwareBackPress',
-        onBackPress
+        onBackPress,
       );
 
       return () => sub.remove();
-    }, [navigation])
+    }, [navigation]),
   );
 
   /* ================= 목록 조회 (단일 진입점) ================= */
@@ -120,7 +124,7 @@ export default function MyPouchScreen() {
   useFocusEffect(
     useCallback(() => {
       fetchMyCosmetics();
-    }, [])
+    }, []),
   );
 
   /* ================= 네비게이션 ================= */
@@ -132,9 +136,12 @@ export default function MyPouchScreen() {
   };
 
   const goRegister = () => {
-    navigation.navigate('CaptureStack' as never, {
-      screen: 'CosmeticRegister',
-    } as never);
+    navigation.navigate(
+      'CaptureStack' as never,
+      {
+        screen: 'CosmeticRegister',
+      } as never,
+    );
   };
 
   /* ================= Render ================= */
@@ -164,9 +171,7 @@ export default function MyPouchScreen() {
         activeOpacity={0.9}
         onPress={goRegister}
       >
-        <Text style={styles.primaryButtonText}>
-          화장품 등록
-        </Text>
+        <Text style={styles.primaryButtonText}>화장품 등록</Text>
       </TouchableOpacity>
 
       <FlatList
@@ -194,23 +199,17 @@ export default function MyPouchScreen() {
                   />
                 ) : (
                   <View style={styles.thumbFallback}>
-                    <Text style={styles.thumbFallbackText}>
-                      No Image
-                    </Text>
+                    <Text style={styles.thumbFallbackText}>No Image</Text>
                   </View>
                 )}
               </View>
 
               <View style={styles.cardInfo}>
-                <Text
-                  style={styles.cardTitle}
-                  numberOfLines={1}
-                >
+                <Text style={styles.cardTitle} numberOfLines={1}>
                   {item.cosmeticName}
                 </Text>
                 <Text style={styles.cardSub}>
-                  등록일 ·{' '}
-                  {new Date(item.createdAt).toLocaleDateString()}
+                  등록일 · {new Date(item.createdAt).toLocaleDateString()}
                 </Text>
               </View>
             </TouchableOpacity>
