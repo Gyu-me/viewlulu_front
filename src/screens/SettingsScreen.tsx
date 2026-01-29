@@ -56,7 +56,7 @@ export default function SettingsScreen() {
   useFocusEffect(
     useCallback(() => {
       const onBackPress = () => {
-        navigation.navigate('Home');
+        navigation.getParent()?.navigate('HomeTab');
         return true; // 기본 종료 차단
       };
 
