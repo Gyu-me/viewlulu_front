@@ -12,6 +12,7 @@ import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 
 import MyPouchScreen from '../screens/MyPouchScreen';
 import CosmeticDetailScreen from '../screens/CosmeticDetailScreen';
+import CosmeticEditScreen from '../screens/CosmeticEditScreen';
 
 export type MyPouchStackParamList = {
   MyPouch: undefined;
@@ -19,12 +20,14 @@ export type MyPouchStackParamList = {
     cosmeticId: string;
     fromDetect?: boolean;
   };
+  CosmeticEdit: {
+    cosmeticId: string;
+  };
 };
 
 const Stack = createNativeStackNavigator<MyPouchStackParamList>();
 
 export default function MyPouchStackNavigator({ navigation, route }: any) {
-
   return (
     <Stack.Navigator
       screenOptions={{
@@ -33,7 +36,6 @@ export default function MyPouchStackNavigator({ navigation, route }: any) {
         contentStyle: { backgroundColor: '#0A0A0A' },
       }}
     >
-
       <Stack.Screen
         name="MyPouch"
         component={MyPouchScreen}
@@ -45,7 +47,15 @@ export default function MyPouchStackNavigator({ navigation, route }: any) {
         component={CosmeticDetailScreen}
         options={{ headerShown: false }}
       />
+
+      <Stack.Screen
+        name="CosmeticEdit"
+        component={CosmeticEditScreen}
+        options={{
+          headerShown: false,
+          presentation: 'card',
+        }}
+      />
     </Stack.Navigator>
   );
 }
-
