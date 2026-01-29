@@ -21,6 +21,8 @@ import {
   CommonActions,
 } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { saveFaceAnalysisResultApi } from '../api/faceAnalysis.api';
 
 type Nav = NativeStackNavigationProp<any>;
 const { FaceShapeTflite } = NativeModules as any;
@@ -100,20 +102,11 @@ export default function FaceResultScreen() {
 
         const ranked = CLASS_ORDER.map((cls, i) => ({
           cls,
-          prob: probs[idx] ?? 0,
-        }));
+          prob: probs[i] ?? 0,
+        })).sort((a, b) => b.prob - a.prob);
 
-        // ✅ Top-2 정렬
-        items.sort((a, b) => b.prob - a.prob);
-        const top2 = items.slice(0, 2);
+        const top2 = ranked.slice(0, 2);
 
-        // ✅ 화면에 표시할 형태로 변환
-        // =========================================================
-        // ✅ [변경] 500% 방식:
-        // - 모델 prob(0~1)을 "각 클래스별 0~100점"으로 환산
-        // - 즉 5개를 다 합치면 최대 500%가 되는 표현 방식
-        // - 그중 가장 높은 2개만 추출
-        // =========================================================
         const next: ResultItem[] = top2.map(({ cls, prob }) => {
           const meta = (FACE_META as any)[cls];
           return {
@@ -142,6 +135,7 @@ export default function FaceResultScreen() {
     );
   };
 
+  /** 저장 */
   const handleSave = async () => {
     try {
       const payload = {
@@ -153,15 +147,9 @@ export default function FaceResultScreen() {
       };
 
       await saveFaceAnalysisResultApi(payload);
-
-      // ✅ 저장 성공 후 홈으로
       goHome();
     } catch (e) {
       console.log('[FaceResult] save error', e);
-      Alert.alert(
-        '저장 실패',
-        '결과 저장에 실패했습니다. 잠시 후 다시 시도해주세요.',
-      );
     }
   };
 
@@ -283,10 +271,5 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     alignItems: 'center',
   },
-
-  secondaryText: {
-    color: '#FFD400',
-    fontSize: 16,
-    fontWeight: '700',
-  },
+  secondaryText: { color: '#000', fontSize: 18, fontWeight: '800' },
 });
