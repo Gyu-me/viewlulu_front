@@ -30,6 +30,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { subscribeAuthChanged } from './authEvents';
 
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
@@ -162,6 +163,19 @@ export default function RootNavigator() {
   );
 
   useEffect(() => {
+  const recheck = async () => {
+    const refreshToken = await AsyncStorage.getItem('refreshToken');
+    setInitialRoute(refreshToken ? 'MainTabs' : 'Login');
+  };
+
+  const unsub = subscribeAuthChanged(() => {
+    recheck();
+  });
+
+  return unsub;
+}, []);
+
+  useEffect(() => {
     let mounted = true;
 
     const bootstrap = async () => {
@@ -184,6 +198,7 @@ export default function RootNavigator() {
       mounted = false;
     };
   }, []);
+
 
   if (!initialRoute) {
     return (
