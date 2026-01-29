@@ -11,7 +11,6 @@ import java.io.FileInputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.channels.FileChannel
-import kotlin.math.exp
 
 class FaceShapeTfliteModule(reactContext: ReactApplicationContext) :
     ReactContextBaseJavaModule(reactContext) {
@@ -23,7 +22,8 @@ class FaceShapeTfliteModule(reactContext: ReactApplicationContext) :
     @ReactMethod
     fun predict(imagePath: String, promise: Promise) {
         try {
-            val TEST_MODE = "ones"  // "zeros" or "ones" or "off"
+            val TEST_MODE = "off"  // "zeros" or "ones" or "off"
+            val inputSize = 224
 
             Log.d("FaceShape", "🔥 predict() called")
             Log.d("FaceShape", "imagePath(raw) = $imagePath")
@@ -38,6 +38,8 @@ class FaceShapeTfliteModule(reactContext: ReactApplicationContext) :
             if (interpreter == null) {
                 val modelBuffer = loadModelFile(reactApplicationContext, "faceshape_float32.tflite")
 
+                Log.d("FaceShape", "modelBuffer capacity = ${modelBuffer.capacity()}")
+
                 Log.i("FaceShape", "TFLite runtime version = ${TensorFlowLite.runtimeVersion()}")
                 Log.i("FaceShape", "TFLite schema version = ${TensorFlowLite.schemaVersion()}")
 
@@ -47,44 +49,19 @@ class FaceShapeTfliteModule(reactContext: ReactApplicationContext) :
                 val inputTensor = interpreter!!.getInputTensor(0)
                 val outputTensor = interpreter!!.getOutputTensor(0)
 
-                Log.d("FaceShape", "Input tensor: shape=${inputTensor.shape().joinToString()}, type=${inputTensor.dataType()}")
-                Log.d("FaceShape", "Output tensor: shape=${outputTensor.shape().joinToString()}, type=${outputTensor.dataType()}")
+                Log.d(
+                    "FaceShape",
+                    "Input tensor: shape=${inputTensor.shape().joinToString()}, type=${inputTensor.dataType()}"
+                )
+                Log.d(
+                    "FaceShape",
+                    "Output tensor: shape=${outputTensor.shape().joinToString()}, type=${outputTensor.dataType()}"
+                )
             }
-
-            // 2) 이미지 로드
-            val bmp0 = BitmapFactory.decodeFile(path)
-                ?: throw IllegalArgumentException("Cannot decode image: $path")
-
-            Log.d("FaceShape", "bitmap(original) w=${bmp0.width}, h=${bmp0.height}, config=${bmp0.config}")
-
-            // 3) 중앙 crop 후 리사이즈
-            val inputSize = 224
-
-            val size = minOf(bmp0.width, bmp0.height)
-            val x = (bmp0.width - size) / 2
-            val y = (bmp0.height - size) / 2
-
-            val cropped = Bitmap.createBitmap(bmp0, x, y, size, size)
-            val bmp = Bitmap.createScaledBitmap(cropped, inputSize, inputSize, true)
-
-            Log.d("FaceShape", "bitmap(cropped+resized) w=${bmp.width}, h=${bmp.height}")
-
 
             // 4) 입력 텐서 만들기 (float32 [1,224,224,3])
             val input = ByteBuffer.allocateDirect(1 * inputSize * inputSize * 3 * 4)
             input.order(ByteOrder.nativeOrder())
-
-            val pixels = IntArray(inputSize * inputSize)
-            bmp.getPixels(pixels, 0, inputSize, 0, 0, inputSize, inputSize)
-
-            // ✅ 상단 일부 픽셀 샘플 로그
-            for (i in 0 until 10) {
-                val p = pixels[i]
-                val r = ((p shr 16) and 0xFF)
-                val g = ((p shr 8) and 0xFF)
-                val b = (p and 0xFF)
-                Log.d("FaceShape", "pixel[$i] RGB = $r, $g, $b")
-            }
 
             if (TEST_MODE == "zeros") {
                 // 입력을 전부 0으로
@@ -97,15 +74,41 @@ class FaceShapeTfliteModule(reactContext: ReactApplicationContext) :
                     input.putFloat(1f)
                 }
             } else {
-                // 원래 이미지 전처리 (-1~1)
+                // 2) 이미지 로드
+                val bmp0 = BitmapFactory.decodeFile(path)
+                    ?: throw IllegalArgumentException("Cannot decode image: $path")
+
+                Log.d("FaceShape", "bitmap(original) w=${bmp0.width}, h=${bmp0.height}, config=${bmp0.config}")
+
+                // 3) 중앙 crop 후 리사이즈
+                val size = minOf(bmp0.width, bmp0.height)
+                val x = (bmp0.width - size) / 2
+                val y = (bmp0.height - size) / 2
+
+                val cropped = Bitmap.createBitmap(bmp0, x, y, size, size)
+                val bmp = Bitmap.createScaledBitmap(cropped, inputSize, inputSize, true)
+
+                Log.d("FaceShape", "bitmap(cropped+resized) w=${bmp.width}, h=${bmp.height}")
+
+                val pixels = IntArray(inputSize * inputSize)
+                bmp.getPixels(pixels, 0, inputSize, 0, 0, inputSize, inputSize)
+
+                // ✅ 상단 일부 픽셀 샘플 로그
+                for (i in 0 until 10) {
+                    val p = pixels[i]
+                    val r = ((p shr 16) and 0xFF)
+                    val g = ((p shr 8) and 0xFF)
+                    val b = (p and 0xFF)
+                    Log.d("FaceShape", "pixel[$i] RGB = $r, $g, $b")
+                }
+
+                // 원래 이미지 전처리 (-1~1)  ※ Xception preprocess_input과 동일 범위
                 for (p in pixels) {
                     input.putFloat((((p shr 16) and 0xFF) / 127.5f) - 1f)
                     input.putFloat((((p shr 8) and 0xFF) / 127.5f) - 1f)
                     input.putFloat(((p and 0xFF) / 127.5f) - 1f)
                 }
             }
-
-
 
             // ✅ 입력 텐서 샘플 (전처리 검증)
             input.rewind()
@@ -114,31 +117,25 @@ class FaceShapeTfliteModule(reactContext: ReactApplicationContext) :
                 sampleInput[i] = input.float
             }
             Log.d("FaceShape", "input sample (first 12 floats) = ${sampleInput.joinToString()}")
+
+            // ✅ run 직전에도 반드시 rewind (중요)
             input.rewind()
 
             // 5) 출력 [1,5]
             val output = Array(1) { FloatArray(5) }
             interpreter!!.run(input, output)
 
-            // ✅ 모델이 이미 softmax 확률을 출력하므로 그대로 사용
+            // ✅ 모델 출력 그대로 사용 (모델이 softmax 확률을 출력하는 구조라면 그대로)
             Log.d("FaceShape", "probs(from model) = ${output[0].joinToString()}")
 
             val arr = Arguments.createArray()
             for (v in output[0]) arr.pushDouble(v.toDouble())
             promise.resolve(arr)
 
-
         } catch (e: Exception) {
             Log.e("FaceShape", "predict error", e)
             promise.reject("tflite_error", e.message, e)
         }
-    }
-
-    private fun softmax(logits: FloatArray): FloatArray {
-        val max = logits.maxOrNull() ?: 0f
-        val exps = logits.map { exp((it - max).toDouble()).toFloat() }
-        val sum = exps.sum().coerceAtLeast(1e-12f)
-        return exps.map { it / sum }.toFloatArray()
     }
 
     private fun loadModelFile(context: ReactApplicationContext, assetName: String): ByteBuffer {

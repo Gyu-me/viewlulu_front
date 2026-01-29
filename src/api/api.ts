@@ -90,22 +90,28 @@ let preRefreshing = false;
 let preRefreshPromise: Promise<void> | null = null;
 
 const runPreRefreshIfNeeded = async () => {
-  if (tokenGateResolved) return; // 이미 준비됨
+  // 이미 준비됐거나, 이미 refresh 중이면 그대로 대기
+  if (tokenGateResolved) return;
   if (preRefreshing) return preRefreshPromise ?? undefined;
 
   const refreshToken = await AsyncStorage.getItem('refreshToken');
+
+  // 🔴 refreshToken 자체가 없으면 비로그인 상태
+  // → gate를 열어도 됨 (어차피 Authorization 붙일 수 없음)
   if (!refreshToken) {
-    // 비로그인 상태
     tokenGateResolved = true;
     return;
   }
 
   const accessToken = await AsyncStorage.getItem('accessToken');
+
+  // 🟢 accessToken이 이미 있으면 즉시 gate open
   if (accessToken) {
     tokenGateResolved = true;
     return;
   }
 
+  // 🟡 refreshToken은 있고 accessToken은 없는 상태 → pre-refresh 시도
   preRefreshing = true;
   preRefreshPromise = (async () => {
     try {
@@ -114,23 +120,26 @@ const runPreRefreshIfNeeded = async () => {
       });
 
       const newAccessToken = res.data?.accessToken;
+
       if (newAccessToken) {
         await AsyncStorage.setItem('accessToken', newAccessToken);
+
+        // ✅ 오직 accessToken 확보 시에만 gate open
         tokenGateResolved = true;
         return;
       }
 
-      // accessToken을 못 받았으면 gate는 열되(대기 종료),
-      // 이후 401 흐름은 response interceptor가 처리
-      tokenGateResolved = true;
+      // ❗ accessToken을 못 받았으면 gate는 열지 않음
+      // 이후 요청은 response interceptor에서 401 처리
     } catch (e: any) {
-      // ❗ 실패해도 로그아웃 처리하지 않음 (의도된 설계)
-      // 단, 명확히 invalid이면 여기서도 정리
       const status = e?.response?.status;
+
+      // ❗ refreshToken이 명확히 invalid한 경우만 정리
       if (status === 401 || status === 403) {
         await AsyncStorage.multiRemove(['accessToken', 'refreshToken', 'user']);
       }
-      tokenGateResolved = true;
+
+      // ❌ gate open 하지 않음
     } finally {
       preRefreshing = false;
     }
@@ -255,18 +264,7 @@ api.interceptors.response.use(
 
       // ❗ 명확히 invalid일 때만 로그아웃
       if (status === 401 || status === 403) {
-        await AsyncStorage.multiRemove([
-          'accessToken',
-          'refreshToken',
-          'user',
-        ]);
-        //  UI도 같이 로그인 상태로 되돌림
-          if (navigationRef.isReady()) {
-            navigationRef.reset({
-              index: 0,
-              routes: [{ name: 'Login' }],
-            });
-        }
+        await AsyncStorage.multiRemove(['accessToken', 'refreshToken', 'user']);
       }
 
       return Promise.reject(refreshError);
