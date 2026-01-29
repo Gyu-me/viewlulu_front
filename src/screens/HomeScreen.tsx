@@ -42,7 +42,7 @@ import PackageIcon from '../assets/packageicon.png';
 import NestClockIcon from '../assets/nestclockicon.png';
 import AlertIcon from '../assets/alerticon.png';
 import CameraIcon from '../assets/cameraicon.png';
-import HeroBanner from '../assets/배너.png';
+import HeroBanner from '../assets/Banner.png';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -310,15 +310,20 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   heroImage: {
-    resizeMode: 'cover', // 🔥 필수
+    resizeMode: 'cover',
+    transform: [
+      { translateX: 20 }, // 오른쪽으로
+      { translateY: 20 }, // 아래로
+    ],
   },
+
   heroOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    backgroundColor: 'rgba(0,0,0,0.25)',
   },
   heroContent: {
     position: 'absolute',
-    top: 30, // 🔥 핵심
+    top: 22, // 🔥 핵심
     left: 20,
     right: 20,
   },
