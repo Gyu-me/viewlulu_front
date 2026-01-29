@@ -34,6 +34,7 @@ import type { RootStackParamList } from '../navigation/RootNavigator';
 import { loginApi } from '../api/auth.api';
 import AppIcon from '../assets/ViewLuluAppIcon.png';
 import { InteractionManager } from 'react-native';
+import { emitAuthChanged } from '../navigation/authEvents';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -109,24 +110,23 @@ export default function LoginScreen() {
       // 🔊 로그인 성공 TTS
       Tts.stop();
       Tts.speak('로그인되었습니다.');
+      // 🔐 로그인 성공 TTS가 끝난 뒤에만 홈으로 이동
+      let handled = false;
 
-      // 🔥 TTS 종료 후 화면 전환 (음성 충돌 방지)
-      InteractionManager.runAfterInteractions(() => {
-        setTimeout(() => {
-          navigation.reset({
-            index: 0,
-            routes: [
-              {
-                name: 'MainTabs',
-                state: {
-                  index: 0,
-                  routes: [{ name: 'HomeTab' }],
-                },
-              },
-            ],
-          });
-        }, 800); // TTS 여유 시간 (600~1000ms 권장)
+      const finishListener = Tts.addEventListener('tts-finish', () => {
+        if (handled) return;
+        handled = true;
+        finishListener.remove();
+        emitAuthChanged();
       });
+
+      // ⚠️ tts-finish 이벤트 안 오는 기기 대비 fallback
+      setTimeout(() => {
+        if (handled) return;
+        handled = true;
+        finishListener.remove();
+        emitAuthChanged();
+      }, 4000);
     } catch (err: any) {
       const serverMessage = err?.response?.data?.message;
       const errorMessage = err?.message;

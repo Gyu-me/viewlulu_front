@@ -165,7 +165,10 @@ export default function RootNavigator() {
   useEffect(() => {
     const recheck = async () => {
       const refreshToken = await AsyncStorage.getItem('refreshToken');
-      setInitialRoute(refreshToken ? 'MainTabs' : 'Login');
+      const accessToken = await AsyncStorage.getItem('accessToken');
+
+      // ✅ accessToken 기준으로만 로그인 UI 판단
+      setInitialRoute(accessToken ? 'MainTabs' : 'Login');
     };
 
     const unsub = subscribeAuthChanged(() => {
