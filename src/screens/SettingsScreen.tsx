@@ -28,6 +28,7 @@ import {
 
 import { colors } from '../theme/colors';
 import { api } from '../api/api';
+import { emitAuthChanged } from '../navigation/authEvents';
 
 const VOICE_WAKE_KEY = 'voiceWakeEnabled';
 
@@ -100,10 +101,7 @@ export default function SettingsScreen() {
                 'user',
               ]);
 
-              navigation.reset({
-                index: 0,
-                routes: [{ name: 'Login' }],
-              });
+              emitAuthChanged(); // 🔥 RootNavigator가 UI 전환 담당
             }
           },
         },
