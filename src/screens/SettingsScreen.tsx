@@ -21,13 +21,11 @@ import {
   Switch,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {
-  useNavigation,
-  useFocusEffect,
-} from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 
 import { colors } from '../theme/colors';
 import { api } from '../api/api';
+import { emitAuthChanged } from '../navigation/authEvents';
 import { emitAuthChanged } from '../navigation/authEvents';
 
 const VOICE_WAKE_KEY = 'voiceWakeEnabled';
@@ -65,13 +63,13 @@ export default function SettingsScreen() {
 
       const subscription = BackHandler.addEventListener(
         'hardwareBackPress',
-        onBackPress
+        onBackPress,
       );
 
       return () => {
         subscription.remove();
       };
-    }, [navigation])
+    }, [navigation]),
   );
 
   /* ================= Logout ================= */
@@ -101,12 +99,15 @@ export default function SettingsScreen() {
                 'user',
               ]);
 
-              emitAuthChanged(); // 🔥 RootNavigator가 UI 전환 담당
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'Login' }],
+              });
             }
           },
         },
       ],
-      { cancelable: true }
+      { cancelable: true },
     );
   };
 
