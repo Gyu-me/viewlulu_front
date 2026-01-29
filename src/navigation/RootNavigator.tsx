@@ -163,17 +163,17 @@ export default function RootNavigator() {
   );
 
   useEffect(() => {
-  const recheck = async () => {
-    const refreshToken = await AsyncStorage.getItem('refreshToken');
-    setInitialRoute(refreshToken ? 'MainTabs' : 'Login');
-  };
+    const recheck = async () => {
+      const refreshToken = await AsyncStorage.getItem('refreshToken');
+      setInitialRoute(refreshToken ? 'MainTabs' : 'Login');
+    };
 
-  const unsub = subscribeAuthChanged(() => {
-    recheck();
-  });
+    const unsub = subscribeAuthChanged(() => {
+      recheck();
+    });
 
-  return unsub;
-}, []);
+    return unsub;
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -198,7 +198,6 @@ export default function RootNavigator() {
       mounted = false;
     };
   }, []);
-
 
   if (!initialRoute) {
     return (
