@@ -23,6 +23,7 @@ import {
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { saveFaceAnalysisResultApi } from '../api/faceAnalysis.api';
+import { CommonActions } from '@react-navigation/native';
 
 type Nav = NativeStackNavigationProp<any>;
 const { FaceShapeTflite } = NativeModules as any;
@@ -36,7 +37,6 @@ type ResultItem = {
 export default function FaceResultScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<any>();
-  const insets = useSafeAreaInsets();
 
   /** mode */
   const mode = route.params?.mode ?? 'analysis';
@@ -107,8 +107,14 @@ export default function FaceResultScreen() {
 
         const top2 = ranked.slice(0, 2);
 
+        // ✅ 화면에 표시할 형태로 변환
         const next: ResultItem[] = top2.map(({ cls, prob }) => {
           const meta = (FACE_META as any)[cls];
+
+          // ✅ (500% 방식) 각 클래스는 독립적으로 0~100
+          // 예: prob=0.85 -> 85%
+          const score = Math.round(prob * 100);
+
           return {
             label: meta?.label ?? String(cls),
             percent: Math.round(prob * 100), // ✅ 독립 0~100%
@@ -135,7 +141,6 @@ export default function FaceResultScreen() {
     );
   };
 
-  /** 저장 */
   const handleSave = async () => {
     try {
       const payload = {
@@ -147,20 +152,20 @@ export default function FaceResultScreen() {
       };
 
       await saveFaceAnalysisResultApi(payload);
+
+      // ✅ 저장 성공 후 홈으로
       goHome();
     } catch (e) {
       console.log('[FaceResult] save error', e);
+      Alert.alert(
+        '저장 실패',
+        '결과 저장에 실패했습니다. 잠시 후 다시 시도해주세요.',
+      );
     }
   };
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={{
-        paddingTop: insets.top + 24,
-        paddingBottom: 40 + insets.bottom,
-      }}
-    >
+    <ScrollView style={styles.container}>
       <Text style={styles.title}>얼굴형 분석 결과</Text>
 
       {photoPath && (
@@ -266,10 +271,16 @@ const styles = StyleSheet.create({
   primaryText: { color: '#000', fontSize: 18, fontWeight: '800' },
 
   secondaryButton: {
-    backgroundColor: '#FFD400',
-    paddingVertical: 18,
+    borderWidth: 2,
+    borderColor: '#FFD400',
+    paddingVertical: 16,
     borderRadius: 30,
     alignItems: 'center',
   },
-  secondaryText: { color: '#000', fontSize: 18, fontWeight: '800' },
+
+  secondaryText: {
+    color: '#000',
+    fontSize: 18,
+    fontWeight: '800',
+  },
 });
