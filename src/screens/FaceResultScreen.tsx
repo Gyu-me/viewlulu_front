@@ -1,8 +1,9 @@
 /**
- * FaceResultScreen (🔥 UI 유지 + 기능 통합 FINAL)
+ * FaceResultScreen (🔥 FINAL)
  * --------------------------------------------------
- * - UI / 버튼 / 배치 / 접근성: 기존 유지
- * - 기능: TFLite 결과 Top2 + 독립 퍼센트(0~100) 방식
+ * - 화면: 얼굴형 5개 전부 출력
+ * - 음성(TTS): Top2만 읽어줌
+ * - UI / 버튼 / 스타일: 기존 유지
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
@@ -23,9 +24,10 @@ import {
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { saveFaceAnalysisResultApi } from '../api/faceAnalysis.api';
+import Tts from 'react-native-tts';
 
 type Nav = NativeStackNavigationProp<any>;
-const { FaceShapeTflite } = NativeModules as any;
+const { FaceShapeTflite, TtsModule } = NativeModules as any;
 
 type ResultItem = {
   label: string;
@@ -78,13 +80,16 @@ export default function FaceResultScreen() {
     [],
   );
 
-  /** 결과 state (Top2) */
+  /** 결과 state (5개 전부) */
   const [results, setResults] = useState<ResultItem[]>([
     { label: '분석 중...', percent: 0, desc: '얼굴형을 분석하고 있어요.' },
     { label: '분석 중...', percent: 0, desc: '잠시만 기다려주세요.' },
+    { label: '분석 중...', percent: 0, desc: '잠시만 기다려주세요.' },
+    { label: '분석 중...', percent: 0, desc: '잠시만 기다려주세요.' },
+    { label: '분석 중...', percent: 0, desc: '잠시만 기다려주세요.' },
   ]);
 
-  /** 추론 */
+  /** 추론 + TTS */
   useEffect(() => {
     if (!photoPath || isReadOnly) return;
 
@@ -95,28 +100,39 @@ export default function FaceResultScreen() {
           : `file://${photoPath}`;
 
         const probs: number[] = await FaceShapeTflite.predict(uri);
-
         if (!Array.isArray(probs) || probs.length < 5) {
           throw new Error('Invalid probs');
         }
 
-        const ranked = CLASS_ORDER.map((cls, i) => ({
+        const items = CLASS_ORDER.map((cls, idx) => ({
           cls,
-          prob: probs[i] ?? 0,
+          prob: probs[idx] ?? 0,
         })).sort((a, b) => b.prob - a.prob);
 
-        const top2 = ranked.slice(0, 2);
-
-        const next: ResultItem[] = top2.map(({ cls, prob }) => {
+        /** 화면용: 5개 */
+        const next: ResultItem[] = items.map(({ cls, prob }) => {
           const meta = (FACE_META as any)[cls];
           return {
             label: meta?.label ?? String(cls),
-            percent: Math.round(prob * 100), // ✅ 독립 0~100%
-            desc: meta?.desc ?? '얼굴형 특징 설명을 준비 중입니다.',
+            percent: Math.round(prob * 100),
+            desc: meta?.desc ?? '',
           };
         });
 
         setResults(next);
+
+        /** 🔊 TTS용: Top2만 */
+        const top2 = next.slice(0, 2);
+        const ttsText =
+          `가장 가까운 얼굴형은 ${top2[0].label}, 다음은 ${top2[1].label}입니다. ` +
+          `사진 각도나 조명에 따라 결과가 조금 달라질 수 있어요. ` +
+          `자세한 설명은 화면을 눌러 확인해주세요.`;
+        Tts.stop();
+        Tts.setDefaultRate(0.45);
+        Tts.setDefaultPitch(1.0);
+        Tts.speak(ttsText);
+
+        TtsModule?.speak?.(ttsText);
       } catch (e) {
         console.log('[FaceShape] inference error:', e);
       }
@@ -125,7 +141,7 @@ export default function FaceResultScreen() {
     run();
   }, [photoPath, isReadOnly, CLASS_ORDER, FACE_META]);
 
-  /** 홈 이동 (Root 구조 유지) */
+  /** 홈 이동 */
   const goHome = () => {
     navigation.dispatch(
       CommonActions.navigate({
@@ -202,7 +218,9 @@ function ResultCard({ label, percent, desc }: ResultItem) {
     <View style={styles.card}>
       <View style={styles.cardHeader}>
         <Text style={styles.cardTitle}>{label}</Text>
-        <Text style={styles.cardPercent}>{percent}%</Text>
+        <Text style={styles.cardPercent}>
+          {percent < 5 ? '5% 미만' : `${percent}%`}
+        </Text>
       </View>
 
       <View style={styles.barBackground}>
