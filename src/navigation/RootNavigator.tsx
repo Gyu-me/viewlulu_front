@@ -31,6 +31,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { subscribeAuthChanged } from './authEvents';
+import { useAppForegroundAuth } from './useAppForegroundAuth';
 
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
@@ -158,6 +159,7 @@ function MainTabs() {
 /* ================= Root ================= */
 
 export default function RootNavigator() {
+  useAppForegroundAuth();
   const [initialRoute, setInitialRoute] = useState<'Login' | 'MainTabs' | null>(
     null,
   );
@@ -165,10 +167,9 @@ export default function RootNavigator() {
   useEffect(() => {
     const recheck = async () => {
       const refreshToken = await AsyncStorage.getItem('refreshToken');
-      const accessToken = await AsyncStorage.getItem('accessToken');
 
       // ✅ accessToken 기준으로만 로그인 UI 판단
-      setInitialRoute(accessToken ? 'MainTabs' : 'Login');
+      setInitialRoute(refreshToken ? 'MainTabs' : 'Login');
     };
 
     const unsub = subscribeAuthChanged(() => {
