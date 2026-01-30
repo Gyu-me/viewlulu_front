@@ -117,7 +117,7 @@ export default function SettingsScreen() {
     >
       <Text style={styles.title}>설정</Text>
 
-      {/* ================= Voice Wake ================= */}
+      {/* ================= Voice Wake =================
       <Text style={styles.sectionTitle}>음성 기능</Text>
 
       <View style={styles.settingRow}>
@@ -132,14 +132,14 @@ export default function SettingsScreen() {
 
       <Text style={styles.settingDesc}>
         앱 사용 중 “뷰루루”라고 말하면 음성 기능이 실행됩니다.
-      </Text>
+      </Text> */}
 
       {/* ================= App Info ================= */}
       <Text style={styles.sectionTitle}>앱 정보</Text>
 
       <View style={styles.settingCard}>
         <Text style={styles.settingTitle}>버전</Text>
-        <Text style={styles.settingValue}>v1.0.2</Text>
+        <Text style={styles.settingValue}>v2.0.0</Text>
       </View>
 
       {/* ================= Account ================= */}
