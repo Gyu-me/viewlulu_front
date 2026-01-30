@@ -210,6 +210,10 @@ export default function LoginScreen() {
               onChangeText={setPassword}
               secureTextEntry
               returnKeyType="done"
+              /* 대문자로 시작 끔*/
+              autoCapitalize="none"
+              autoCorrect={false}
+              textContentType="password"
               accessibilityLabel="비밀번호 입력창"
               accessibilityHint="로그인 비밀번호를 입력하세요"
               onFocus={() => handleFocus('비밀번호')}
