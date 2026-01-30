@@ -1,20 +1,22 @@
 /**
- * api.ts (🔥 REAL FINAL STABLE)
+ * api.ts (🔥 REAL FINAL STABLE - NO AUTO LOGOUT)
  * --------------------------------------------------
+ * 주요 기능 요약:
  * ✅ baseURL: .env → API_BASE_URL
  * ✅ auth/login, auth/register, auth/refresh → Authorization ❌
  * ✅ 그 외 요청 → Authorization 자동 주입
  * ✅ FormData 요청 시 Content-Type 제거
- * ✅ 앱 시작 시 accessToken 로딩 큐 적용
+ * ✅ 앱 시작 시 accessToken 로딩 게이트 적용
  * ✅ 401 발생 시 refreshToken으로 accessToken 자동 재발급 (큐)
- * ✅ refreshToken invalid(401/403)일 때만 로그아웃
- * ✅ 사용자는 절대 로그아웃 체감 ❌
+ * ✅ refreshToken invalid여도 로그아웃 ❌
+ * ✅ 로그아웃은 오직 "사용자 버튼"으로만 발생
  */
 
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { logoutAndRedirect } from '../navigation/authActions';
 import { API_BASE_URL } from '@env';
+import { logoutAndRedirect } from '../navigation/authActions';
+import { Buffer } from 'buffer';
 
 /* ================= Env Check ================= */
 
@@ -34,44 +36,64 @@ export const api = axios.create({
 });
 
 /* ==================================================
- * 🔒 TOKEN READY GATE (앱 시작 / 로그인 직후 경쟁상태 방지)
- * - "스토리지 한번 읽음"이 아니라
- *   "토큰을 붙일 수 있는 상태"가 되었음을 의미
+ * 🔎 JWT exp 파싱 (선제 refresh용)
+ * - exp(초) → ms로 변환
+ * - 파싱 실패 시 null
+ * ================================================== */
+
+const decodeJwtExpMs = (token: string): number | null => {
+  try {
+    const parts = token.split('.');
+    if (parts.length < 2) return null;
+
+    // base64url → base64
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+
+    // RN 환경에서 Buffer 사용 가능
+    const json = Buffer.from(padded, 'base64').toString('utf8');
+    const payload = JSON.parse(json);
+
+    if (typeof payload?.exp !== 'number') return null;
+    return payload.exp * 1000;
+  } catch {
+    return null;
+  }
+};
+
+/* ==================================================
+ * 🔒 TOKEN READY GATE
+ * - 앱 시작 / 로그인 직후 경쟁상태 방지
  * ================================================== */
 
 let tokenGateResolved = false;
 let tokenGatePromise: Promise<void> | null = null;
 
-/** 토큰 게이트를 열어줌 (로그인/리프레시 성공 직후 호출 가능) */
+/** 로그인/리프레시 성공 직후 호출 가능 */
 export const markTokenReady = () => {
   tokenGateResolved = true;
 };
 
-/** 앱 시작 시 토큰 상태를 한 번만 스캔 */
+/** 앱 시작 시 토큰 상태 1회 스캔 */
 const ensureTokenGate = async () => {
   if (tokenGateResolved) return;
 
   if (!tokenGatePromise) {
     tokenGatePromise = (async () => {
-      // accessToken이 있으면 즉시 ready
       const access = await AsyncStorage.getItem('accessToken');
       if (access) {
         tokenGateResolved = true;
         return;
       }
 
-      // accessToken이 없으면 refreshToken 확인까지만 하고,
-      // (필요 시) pre-refresh가 request interceptor에서 1회 수행됨
       const refresh = await AsyncStorage.getItem('refreshToken');
       if (!refresh) {
-        // refreshToken도 없으면 더 대기할 이유가 없음 (비로그인)
+        // 비로그인 상태
         tokenGateResolved = true;
         return;
       }
 
-      // refreshToken은 있는데 accessToken이 없는 상태:
-      // 여기서는 "gate를 열지 않고" 대기 상태 유지.
-      // 실제 refresh는 아래 pre-refresh 로직에서 수행.
+      // refreshToken만 있는 경우 → pre-refresh에서 처리
     })();
   }
 
@@ -79,39 +101,41 @@ const ensureTokenGate = async () => {
 };
 
 /* ==================================================
- * 🔁 PRE-REFRESH (앱 시작 직후 첫 요청에서 401 방지)
- * - accessToken이 없고 refreshToken이 있으면
- *   요청을 보내기 전에 1회 조용히 refresh 시도
- * - 성공하면 accessToken 저장 + gate open
- * - 실패해도 네 설계(로그아웃 체감 ❌) 유지
+ * 🔁 PRE-REFRESH
+ * - accessToken 없고 refreshToken 있으면
+ *   첫 요청 전에 조용히 1회 시도
  * ================================================== */
 
 let preRefreshing = false;
 let preRefreshPromise: Promise<void> | null = null;
 
 const runPreRefreshIfNeeded = async () => {
-  // 이미 준비됐거나, 이미 refresh 중이면 그대로 대기
-  if (tokenGateResolved) return;
-  if (preRefreshing) return preRefreshPromise ?? undefined;
+  if (tokenGateResolved) {
+    console.log('[PRE-REFRESH] skipped (tokenGateResolved)');
+    return;
+  }
+  if (preRefreshing) {
+    console.log('[PRE-REFRESH] already running, wait');
+    return preRefreshPromise ?? undefined;
+  }
 
   const refreshToken = await AsyncStorage.getItem('refreshToken');
 
-  // 🔴 refreshToken 자체가 없으면 비로그인 상태
-  // → gate를 열어도 됨 (어차피 Authorization 붙일 수 없음)
   if (!refreshToken) {
+    console.log('[PRE-REFRESH] no refreshToken');
     tokenGateResolved = true;
     return;
   }
 
   const accessToken = await AsyncStorage.getItem('accessToken');
-
-  // 🟢 accessToken이 이미 있으면 즉시 gate open
   if (accessToken) {
+    console.log('[PRE-REFRESH] accessToken already exists');
     tokenGateResolved = true;
     return;
   }
 
-  // 🟡 refreshToken은 있고 accessToken은 없는 상태 → pre-refresh 시도
+  console.warn('[PRE-REFRESH] start');
+
   preRefreshing = true;
   preRefreshPromise = (async () => {
     try {
@@ -120,28 +144,20 @@ const runPreRefreshIfNeeded = async () => {
       });
 
       const newAccessToken = res.data?.accessToken;
-
       if (newAccessToken) {
         await AsyncStorage.setItem('accessToken', newAccessToken);
-
-        // ✅ 오직 accessToken 확보 시에만 gate open
         tokenGateResolved = true;
-        return;
+        console.log('[PRE-REFRESH] success, new accessToken saved');
+      } else {
+        console.warn('[PRE-REFRESH] response has no accessToken');
       }
-
-      // ❗ accessToken을 못 받았으면 gate는 열지 않음
-      // 이후 요청은 response interceptor에서 401 처리
     } catch (e: any) {
-      const status = e?.response?.status;
-
-      // ❗ refreshToken이 명확히 invalid한 경우만 정리
-      if (status === 401 || status === 403) {
-        await AsyncStorage.multiRemove(['accessToken', 'refreshToken', 'user']);
-      }
-
-      // ❌ gate open 하지 않음
+      console.warn('[PRE-REFRESH] failed', e?.response?.status);
+      // ❌ 실패해도 로그아웃 금지
+      // 이후 요청에서 다시 시도됨
     } finally {
       preRefreshing = false;
+      console.log('[PRE-REFRESH] end');
     }
   })();
 
@@ -154,12 +170,25 @@ api.interceptors.request.use(
   async config => {
     const url = config.url ?? '';
 
+    const currentToken = await AsyncStorage.getItem('accessToken');
+
+    if (currentToken) {
+      const expMs = decodeJwtExpMs(currentToken);
+      const now = Date.now();
+      const expInSec =
+        expMs !== null ? Math.floor((expMs - now) / 1000) : 'unknown';
+
+      console.log(`[REQ] ${url} | token exp in: ${expInSec}s`);
+    } else {
+      console.log(`[REQ] ${url} | NO accessToken`);
+    }
+
     const isAuthRequest =
       url.includes('/auth/login') ||
       url.includes('/auth/register') ||
       url.includes('/auth/refresh');
 
-    // 🔥 RN FormData 안전 처리
+    // RN FormData 안전 처리
     const isFormData =
       typeof config.data === 'object' &&
       config.data !== null &&
@@ -170,18 +199,53 @@ api.interceptors.request.use(
     }
 
     if (!isAuthRequest) {
-      // 1) 앱 시작 시 토큰 상태 스캔
       await ensureTokenGate();
 
-      // 2) accessToken이 없고 refreshToken이 있으면
-      //    첫 요청에서 조용히 refresh 1회 시도
       if (!tokenGateResolved) {
+        console.log('[REQ] tokenGate not resolved, try pre-refresh');
         await runPreRefreshIfNeeded();
       }
 
-      // 3) 최종적으로 accessToken이 있으면 붙이기
       const token = await AsyncStorage.getItem('accessToken');
+
       if (token) {
+        const expMs = decodeJwtExpMs(token);
+        const now = Date.now();
+
+        const shouldPreemptiveRefresh = expMs !== null && expMs - now <= 60_000;
+
+        if (shouldPreemptiveRefresh) {
+          console.warn(`[PREEMPTIVE] ${url} token expiring soon, try refresh`);
+
+          try {
+            const refreshToken = await AsyncStorage.getItem('refreshToken');
+            if (refreshToken) {
+              const res = await axios.post(`${API_BASE_URL}/auth/refresh`, {
+                refreshToken,
+              });
+
+              const newAccessToken = res.data?.accessToken;
+              if (newAccessToken) {
+                await AsyncStorage.setItem('accessToken', newAccessToken);
+                tokenGateResolved = true;
+
+                config.headers = config.headers ?? {};
+                config.headers.Authorization = `Bearer ${newAccessToken}`;
+
+                console.log('[PREEMPTIVE] refresh success, use new token');
+                return config;
+              }
+            }
+          } catch (e: any) {
+            console.warn(
+              '[PREEMPTIVE] refresh failed, fallback to response interceptor',
+              e?.response?.status,
+            );
+            // ❌ 여기서 로그아웃 금지
+            // → response interceptor에서 최종 처리
+          }
+        }
+
         config.headers = config.headers ?? {};
         config.headers.Authorization = `Bearer ${token}`;
       }
@@ -198,35 +262,47 @@ api.interceptors.request.use(
 
 let isRefreshing = false;
 let failedQueue: {
-  resolve: (token: string) => void;
+  resolve: (token: string | null) => void;
   reject: (err: any) => void;
 }[] = [];
 
 const processQueue = (error: any, token: string | null = null) => {
-  failedQueue.forEach(promise => {
-    if (error) promise.reject(error);
-    else if (token) promise.resolve(token);
-  });
+  console.log('[QUEUE] processQueue', error ? 'with error' : 'success');
+
+  failedQueue.forEach(p => (error ? p.reject(error) : p.resolve(token)));
   failedQueue = [];
 };
 
-/* ================= Response Interceptor ================= */
+/* ================= Response Interceptor (🔥 REAL FINAL) ================= */
 
 api.interceptors.response.use(
   response => response,
   async error => {
     const originalRequest = error.config;
+    const url = originalRequest?.url;
 
     if (error.response?.status !== 401 || originalRequest._retry) {
       return Promise.reject(error);
     }
 
-    // 🔁 이미 refresh 중이면 큐에 대기
+    console.warn(`[401] ${url}`);
+
+    // ===============================
+    // 🔁 이미 refresh 중이면 큐 대기
+    // ===============================
     if (isRefreshing) {
+      console.log(`[QUEUE] ${url} waiting for refresh`);
       return new Promise((resolve, reject) => {
         failedQueue.push({
           resolve: token => {
+            if (!token) {
+              reject(error);
+              return;
+            }
+
+            originalRequest.headers = originalRequest.headers ?? {};
             originalRequest.headers.Authorization = `Bearer ${token}`;
+            console.log(`[RETRY] ${url} (from queue)`);
             resolve(api(originalRequest));
           },
           reject,
@@ -239,7 +315,14 @@ api.interceptors.response.use(
 
     try {
       const refreshToken = await AsyncStorage.getItem('refreshToken');
-      if (!refreshToken) throw new Error('NO_REFRESH_TOKEN');
+
+      if (!refreshToken) {
+        console.warn('[REFRESH] no refreshToken');
+        processQueue(error, null);
+        return Promise.reject(error);
+      }
+
+      console.warn('[REFRESH] start');
 
       const res = await axios.post(`${API_BASE_URL}/auth/refresh`, {
         refreshToken,
@@ -249,27 +332,34 @@ api.interceptors.response.use(
       if (!newAccessToken) throw new Error('NO_NEW_ACCESS_TOKEN');
 
       await AsyncStorage.setItem('accessToken', newAccessToken);
-
-      // ✅ 토큰 준비 완료 게이트 오픈
       tokenGateResolved = true;
+
+      console.log('[REFRESH] success, new accessToken saved');
 
       processQueue(null, newAccessToken);
 
+      originalRequest.headers = originalRequest.headers ?? {};
       originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+
+      console.log(`[RETRY] ${url}`);
       return api(originalRequest);
     } catch (refreshError: any) {
+      console.error('[REFRESH] failed', refreshError?.response?.status);
+
       processQueue(refreshError, null);
 
       const status = refreshError?.response?.status;
 
-      // ❗ 명확히 invalid일 때만 로그아웃
       if (status === 401 || status === 403) {
+        console.error('[REFRESH] refreshToken invalid → logout');
         await AsyncStorage.multiRemove(['accessToken', 'refreshToken', 'user']);
+        logoutAndRedirect();
       }
 
       return Promise.reject(refreshError);
     } finally {
       isRefreshing = false;
+      console.log('[REFRESH] end');
     }
   },
 );

@@ -28,15 +28,13 @@ import {
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { ImageBackground } from 'react-native';
-
 import { colors } from '../theme/colors';
 import { getMyCosmeticsApi } from '../api/cosmetic.api';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+import { startListening, stopListening } from '../voice/voiceListener';
 import { routeVoiceCommand } from '../voice/voiceCommandRouter';
-import { triggerHotword } from '../voice/hotword';
-
-/* 🔊 Hotword */
-import { startHotwordListener, stopHotwordListener } from '../voice/hotword';
+import { requestMicPermission } from '../voice/requestMicPermission';
+import { ScrollView } from 'react-native';
 
 import PackageIcon from '../assets/packageicon.png';
 import NestClockIcon from '../assets/nestclockicon.png';
@@ -53,10 +51,10 @@ type CosmeticItem = {
 
 export default function HomeScreen() {
   const navigation = useNavigation<Nav>();
-
+  /* 내파우치 요약  */
   const [count, setCount] = useState(0);
+  const [over6, setOver6] = useState(0);
   const [over12, setOver12] = useState(0);
-  const [over24, setOver24] = useState(0);
 
   /* 🔥 Android 뒤로가기 → 앱 종료 */
   useFocusEffect(
@@ -85,50 +83,50 @@ export default function HomeScreen() {
     }, []),
   );
 
-  /* ================= Voice Wake Callback ================= */
+  const startVoiceCommand = useCallback(async () => {
+    const granted = await requestMicPermission();
+    if (!granted) {
+      Alert.alert('권한 필요', '마이크 권한이 필요합니다.');
+      return;
+    }
 
-  const handleVoiceWake = useCallback(() => {
-    console.log('[Home] Voice Wake Triggered');
+    Alert.alert('뷰루루 👂', '말씀해주세요');
 
-    /**
-     * 🔥 여기서 "뷰루루" 호출 후 행동 정의
-     * 예:
-     * - TTS 안내
-     * - 특정 화면 이동
-     * - 음성 명령 모드 진입
-     */
-
-    Alert.alert('뷰루루 👀', '무엇을 도와드릴까요?', [{ text: '확인' }], {
-      cancelable: true,
-    });
+    startListening(
+      text => {
+        console.log('[VOICE RESULT]', text);
+        routeVoiceCommand(text, 'HOME');
+        stopListening();
+      },
+      err => {
+        console.warn('[VOICE ERROR]', err);
+        stopListening();
+      },
+    );
   }, []);
-
-  /* 🔊 Home 진입 시 Hotword 시작 / 이탈 시 중지 */
-  useFocusEffect(
-    useCallback(() => {
-      startHotwordListener(handleVoiceWake);
-
-      return () => {
-        stopHotwordListener();
-      };
-    }, [handleVoiceWake]),
-  );
 
   /* ✅ 포커스 진입 시 요약 데이터 로딩 (정석) */
   const fetchSummary = useCallback(async () => {
     try {
       const data: CosmeticItem[] = await getMyCosmeticsApi();
 
-      if (!data || data.length === 0) {
+      if (!Array.isArray(data)) {
         setCount(0);
+        setOver6(0);
         setOver12(0);
-        setOver24(0);
+        return;
+      }
+
+      if (data.length === 0) {
+        setCount(0);
+        setOver6(0);
+        setOver12(0);
         return;
       }
 
       const now = new Date();
+      let c6 = 0;
       let c12 = 0;
-      let c24 = 0;
 
       data.forEach(item => {
         const created = new Date(item.createdAt);
@@ -136,15 +134,24 @@ export default function HomeScreen() {
           (now.getFullYear() - created.getFullYear()) * 12 +
           (now.getMonth() - created.getMonth());
 
-        if (diffMonths >= 24) c24++;
-        else if (diffMonths >= 12) c12++;
+        if (diffMonths >= 12) c12++;
+        else if (diffMonths >= 6) c6++;
       });
 
       setCount(data.length);
+      setOver6(c6);
       setOver12(c12);
-      setOver24(c24);
-    } catch {
-      // UI 변경 없음
+    } catch (err: any) {
+      const status = err?.response?.status;
+
+      // 🔥 인증 실패 계열이면 "서버 데이터 없음" 상태로
+      if (status === 401 || status === 403) {
+        setCount(0);
+        setOver6(0);
+        setOver12(0);
+      }
+
+      // 그 외 네트워크 오류는 기존 UI 유지
     }
   }, []);
 
@@ -156,87 +163,111 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>ViewLulu</Text>
-
-      {/* HERO */}
-      <ImageBackground
-        source={HeroBanner}
-        style={styles.heroCard}
-        imageStyle={styles.heroImage}
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
       >
-        <View style={styles.heroOverlay} />
-        <View style={styles.heroContent}>
-          <Text style={styles.heroTitle}>나의 눈이 되어주는</Text>
-          <Text style={styles.heroBrand}>뷰루루</Text>
-          <Text style={styles.heroDesc}>
-            화장을 등록하고{'\n'}내 화장품을 한 곳에 확인하세요!
-          </Text>
-        </View>
-      </ImageBackground>
+        <View style={styles.headerRow}>
+          <Text style={styles.title}>ViewLulu</Text>
 
-      {/* 얼굴 분석 버튼 */}
-      <View style={styles.analysisRow}>
+          {/* 
         <TouchableOpacity
-          style={[styles.analysisBtn, styles.analysisSecondary]}
-          onPress={() =>
-            navigation.navigate(
-              'FeatureStack' as never,
-              {
-                screen: 'RecentResult',
-              } as never,
-            )
-          }
+          style={styles.ttsTestButton}
+          onPress={startVoiceCommand}
         >
-          <Text style={styles.analysisTextSmall}>최근 분석</Text>
-          <Text style={styles.analysisText}>결과 보기</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.analysisBtn, styles.analysisPrimary]}
-          onPress={() =>
-            navigation.navigate(
-              'FeatureStack' as never,
-              {
-                screen: 'FaceAnalysis',
-              } as never,
-            )
-          }
-        >
-          <Text style={styles.analysisTextSmall}>AI 얼굴형</Text>
-          <Text style={styles.analysisText}>분석하기</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* 파우치 요약 */}
-      <View style={styles.summaryCard}>
-        <Text style={styles.summaryTitle}>내 파우치</Text>
-
-        <View style={styles.summaryRow}>
-          <SummaryItem
-            label="전체"
-            value={count}
-            icon={PackageIcon}
-            iconColor={colors.primary}
-          />
-          <SummaryItem
-            label="12개월"
-            value={over12}
-            icon={NestClockIcon}
-            iconColor="#FF9F0A"
-          />
-          <SummaryItem
-            label="24개월"
-            value={over24}
-            icon={AlertIcon}
-            iconColor="#FF453A"
-          />
+          <Text style={styles.ttsTestText}>🎤 말하기</Text>
+        </TouchableOpacity> 
+        */}
         </View>
-      </View>
+
+        {/* HERO */}
+        <ImageBackground
+          source={HeroBanner}
+          style={styles.heroCard}
+          imageStyle={styles.heroImage}
+        >
+          <View style={styles.heroOverlay} />
+          <View style={styles.heroContent}>
+            <Text style={styles.heroTitle}>나의 눈이 되어주는</Text>
+            <Text style={styles.heroBrand}>뷰루루</Text>
+            <Text style={styles.heroDesc}>
+              화장을 등록하고{'\n'}내 화장품을 한 곳에 확인하세요!
+            </Text>
+          </View>
+        </ImageBackground>
+
+        {/* 얼굴 분석 버튼 */}
+        <View style={styles.analysisRow}>
+          <TouchableOpacity
+            style={[styles.analysisBtn, styles.analysisPrimary]}
+            onPress={() =>
+              navigation.navigate(
+                'FeatureStack' as never,
+                {
+                  screen: 'FaceAnalysis',
+                } as never,
+              )
+            }
+          >
+            <Text style={styles.analysisTextSmall}>AI 얼굴형</Text>
+            <Text style={styles.analysisText}>분석하기</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* 파우치 요약 */}
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryTitle}>내 파우치 요약</Text>
+
+          <View style={styles.summaryRow}>
+            <SummaryItem
+              label="전체"
+              value={count}
+              icon={PackageIcon}
+              iconColor={colors.primary}
+              onPress={() =>
+                navigation.navigate('MyPouchTab', {
+                  screen: 'MyPouch',
+                  params: { filter: 'ALL' },
+                })
+              }
+            />
+
+            <SummaryItem
+              label="6개월"
+              value={over6}
+              icon={NestClockIcon}
+              iconColor="#FF9F0A"
+              onPress={() =>
+                navigation.navigate('MyPouchTab', {
+                  screen: 'MyPouch',
+                  params: { filter: 'OVER_6' },
+                })
+              }
+            />
+
+            <SummaryItem
+              label="12개월"
+              value={over12}
+              icon={AlertIcon}
+              iconColor="#FF453A"
+              onPress={() =>
+                navigation.navigate('MyPouchTab', {
+                  screen: 'MyPouch',
+                  params: { filter: 'OVER_12' },
+                })
+              }
+            />
+          </View>
+        </View>
+      </ScrollView>
 
       {/* 하단 Detect */}
       <View style={styles.fabGlow}>
         <TouchableOpacity
           style={styles.fab}
+          accessibilityRole="button"
+          accessibilityLabel="화장품 인식하기"
+          accessibilityHint="카메라로 화장품을 촬영하여 인식합니다"
           onPress={() =>
             navigation.navigate('CaptureStack', {
               screen: 'CosmeticDetect',
@@ -246,21 +277,6 @@ export default function HomeScreen() {
           <Image source={CameraIcon} style={styles.fabIcon} />
         </TouchableOpacity>
       </View>
-      {/* 🔥 [TEST ONLY] 음성 호출 강제 트리거 */}
-      <TouchableOpacity
-        onPress={() => triggerHotword()}
-        style={{
-          position: 'absolute',
-          top: 10,
-          right: 10,
-          padding: 10,
-          backgroundColor: 'rgba(255,212,0,0.9)',
-          borderRadius: 8,
-          zIndex: 999,
-        }}
-      >
-        <Text style={{ fontWeight: '800' }}>뷰루루 테스트</Text>
-      </TouchableOpacity>
     </View>
   );
 }
@@ -272,20 +288,22 @@ const SummaryItem = ({
   value,
   icon,
   iconColor,
+  onPress,
 }: {
   label: string;
   value: number;
   icon: any;
   iconColor: string;
+  onPress: () => void;
 }) => (
-  <View style={styles.summaryItem}>
+  <TouchableOpacity style={styles.summaryItem} onPress={onPress}>
     <Image
       source={icon}
       style={[styles.summaryIcon, { tintColor: iconColor }]}
     />
     <Text style={styles.summaryValue}>{value}</Text>
     <Text style={styles.summaryLabel}>{label}</Text>
-  </View>
+  </TouchableOpacity>
 );
 
 const styles = StyleSheet.create({
@@ -299,11 +317,11 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontSize: 28,
     fontWeight: '800',
-    marginBottom: 24,
+    marginBottom: 8,
   },
 
   heroCard: {
-    height: 240,
+    height: 210,
     borderRadius: 28,
     backgroundColor: '#1A1A1A',
     marginBottom: 24,
@@ -370,7 +388,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#2A2A2A',
     borderRadius: 20,
-    paddingVertical: 18,
+    paddingVertical: 12,
     alignItems: 'center',
     marginHorizontal: 4,
   },
@@ -388,10 +406,27 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.5)',
     marginTop: 4,
   },
+  scrollContent: {
+    paddingBottom: 140, // 🔥 FAB + 여유 공간
+  },
+
+  fabContainer: {
+    position: 'absolute',
+    bottom: 20,
+    alignSelf: 'center',
+    alignItems: 'center',
+  },
+
+  fabLabel: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
 
   fabGlow: {
     position: 'absolute',
-    bottom: 36,
+    bottom: 20,
     alignSelf: 'center',
     width: 80,
     height: 80,
@@ -457,5 +492,24 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '800',
     color: '#000',
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 24,
+  },
+
+  ttsTestButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
+  },
+
+  ttsTestText: {
+    color: '#000',
+    fontSize: 13,
+    fontWeight: '800',
   },
 });

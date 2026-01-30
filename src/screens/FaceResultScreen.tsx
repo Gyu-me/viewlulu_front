@@ -1,20 +1,9 @@
 /**
- * FaceResultScreen
+ * FaceResultScreen (🔥 FINAL)
  * --------------------------------------------------
- * 얼굴형 분석 결과 화면
- *
- * 기능 설명:
- * - 얼굴형 분석 결과 시각화
- * - 분석 직후 결과 저장 가능
- * - 최근 분석 결과 진입 시 읽기 전용
- *
- * UX 설계:
- * - FeatureStack 내부
- * - 하단 탭 없음
- * - 홈으로 돌아가기 버튼 제공
- *
- * 동작 분기:
- * - route.params.mode === 'history' → 저장 버튼 숨김
+ * - 화면: 얼굴형 5개 전부 출력
+ * - 음성(TTS): Top2만 읽어줌
+ * - UI / 버튼 / 스타일: 기존 유지
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
@@ -27,18 +16,18 @@ import {
   NativeModules,
   Image,
 } from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import {
+  useNavigation,
+  useRoute,
+  CommonActions,
+} from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { saveFaceAnalysisResultApi } from '../api/faceAnalysis.api';
-import { CommonActions } from '@react-navigation/native';
+import Tts from 'react-native-tts';
 
 type Nav = NativeStackNavigationProp<any>;
-
-/* =========================================================
- * ✅ [추가] 네이티브(TFLite) 모듈 연결
- * ========================================================= */
-const { FaceShapeTflite } = NativeModules as any;
+const { FaceShapeTflite, TtsModule } = NativeModules as any;
 
 type ResultItem = {
   label: string;
@@ -51,22 +40,16 @@ export default function FaceResultScreen() {
   const route = useRoute<any>();
   const insets = useSafeAreaInsets();
 
-  /** 진입 모드 */
+  /** mode */
   const mode = route.params?.mode ?? 'analysis';
   const isReadOnly = mode === 'history';
 
-  /* =========================================================
-   * ✅ [추가] FaceAnalysisScreen에서 전달받은 촬영 사진 경로
-   * ========================================================= */
+  /** photo */
   const photoPath: string | undefined = route.params?.photoPath;
 
-  /* =========================================================
-   * ✅ [추가] 얼굴형 라벨/설명 매핑 (Top2 카드에 사용)
-   * - 모델 클래스(영문) → 화면 표시(한글) + 1줄 설명
-   * - 필요하면 문구만 너 스타일로 바꿔도 됨
-   * ========================================================= */
-  const FACE_META = useMemo(() => {
-    return {
+  /** 얼굴형 메타 */
+  const FACE_META = useMemo(
+    () => ({
       Heart: {
         label: '하트형',
         desc: '이마가 넓고 턱이 갸름해 또렷한 인상을 줍니다.',
@@ -87,106 +70,88 @@ export default function FaceResultScreen() {
         label: '각진형',
         desc: '턱선이 뚜렷하고 선이 각져 강한 이미지가 납니다.',
       },
-    } as const;
-  }, []);
+    }),
+    [],
+  );
 
-  /* =========================================================
-   * ✅ [추가] 모델 class_indices 순서에 맞춘 클래스 배열
-   * - facetype_converted.py에서 flow_from_directory 기준으로 보통 알파벳순:
-   *   Heart, Oblong, Oval, Round, Square
-   * - 만약 네 학습 로그 class_indices가 다르면, 여기 순서만 바꾸면 끝
-   * ========================================================= */
-  const CLASS_ORDER = useMemo(() => {
-    return ['Heart', 'Oblong', 'Oval', 'Round', 'Square'] as const;
-  }, []);
+  /** 모델 클래스 순서 */
+  const CLASS_ORDER = useMemo(
+    () => ['Heart', 'Oblong', 'Oval', 'Round', 'Square'] as const,
+    [],
+  );
 
-  /* =========================================================
-   * ✅ [추가] 결과 state: 초기에는 빈 값(0%)으로 2개 카드만 준비
-   * - “임의 결과 3개” 대신 Top2만 표시하도록 변경
-   * ========================================================= */
+  /** 결과 state (5개 전부) */
   const [results, setResults] = useState<ResultItem[]>([
     { label: '분석 중...', percent: 0, desc: '얼굴형을 분석하고 있어요.' },
     { label: '분석 중...', percent: 0, desc: '잠시만 기다려주세요.' },
+    { label: '분석 중...', percent: 0, desc: '잠시만 기다려주세요.' },
+    { label: '분석 중...', percent: 0, desc: '잠시만 기다려주세요.' },
+    { label: '분석 중...', percent: 0, desc: '잠시만 기다려주세요.' },
   ]);
 
-  /* =========================================================
-   * ✅ [추가] analysis 모드에서만: photoPath로 추론 1회 수행 → Top2 반영
-   * - 원본 버튼/네비/화면 구조는 그대로
-   * ========================================================= */
+  /** 추론 + TTS */
   useEffect(() => {
-    if (!photoPath) return;
-    if (isReadOnly) return;
+    if (!photoPath || isReadOnly) return;
 
     const run = async () => {
       try {
-        // ✅ [추가] 호출 여부/값 확인용 로그 (기능 영향 없음)
-        console.log('[FaceShape] photoPath(raw)=', photoPath);
-        console.log('[FaceShape] module exists=', !!FaceShapeTflite);
-        console.log(
-          '[FaceShape] predict typeof=',
-          typeof FaceShapeTflite?.predict,
-        );
-
-        // ✅ [추가] 네이티브로 넘길 경로를 file:// 로 통일 (안전)
         const uri = photoPath.startsWith('file://')
           ? photoPath
           : `file://${photoPath}`;
-        console.log('[FaceShape] photoPath(uri)=', uri);
-        console.log('[FaceShape] calling native predict...');
 
-        // ✅ 네이티브 모듈로부터 5개 확률 받기 (softmax)
         const probs: number[] = await FaceShapeTflite.predict(uri);
-        console.log('[FaceShape] probs=', probs);
-
-        // ✅ (안전) 길이 부족/오류 대비
         if (!Array.isArray(probs) || probs.length < 5) {
-          throw new Error('Invalid probs from native module');
+          throw new Error('Invalid probs');
         }
 
-        // ✅ 클래스별 확률 묶기
         const items = CLASS_ORDER.map((cls, idx) => ({
           cls,
           prob: probs[idx] ?? 0,
-        }));
+        })).sort((a, b) => b.prob - a.prob);
 
-        // ✅ Top-2 정렬
-        items.sort((a, b) => b.prob - a.prob);
-        const top2 = items.slice(0, 2);
-
-        // ✅ 화면에 표시할 형태로 변환
-        const next: ResultItem[] = top2.map(({ cls, prob }) => {
+        /** 화면용: 5개 */
+        const next: ResultItem[] = items.map(({ cls, prob }) => {
           const meta = (FACE_META as any)[cls];
           return {
             label: meta?.label ?? String(cls),
             percent: Math.round(prob * 100),
-            desc: meta?.desc ?? '얼굴형 특징 설명을 준비 중입니다.',
+            desc: meta?.desc ?? '',
           };
         });
 
         setResults(next);
+
+        /** 🔊 TTS용: Top2만 */
+        const top2 = next.slice(0, 2);
+        const ttsText =
+          `가장 가까운 얼굴형은 ${top2[0].label}, 다음은 ${top2[1].label}입니다. ` +
+          `사진 각도나 조명에 따라 결과가 조금 달라질 수 있어요. ` +
+          `자세한 설명은 화면을 눌러 확인해주세요.`;
+        Tts.stop();
+        Tts.setDefaultRate(0.45);
+        Tts.setDefaultPitch(1.0);
+        Tts.speak(ttsText);
+
+        TtsModule?.speak?.(ttsText);
       } catch (e) {
-        // ✅ [추가] 에러를 문자열로도 찍어보기 (네이티브 reject 내용 확인)
-        console.log('[FaceShape] inference error=', String(e));
-        console.log('FaceShape inference error:', e);
-        // 실패 시에도 화면이 깨지지 않도록 기존 “분석 중” 상태 유지
+        console.log('[FaceShape] inference error:', e);
       }
     };
 
     run();
   }, [photoPath, isReadOnly, CLASS_ORDER, FACE_META]);
 
-  /** 홈으로 돌아가기 (원본 유지) */
+  /** 홈 이동 */
   const goHome = () => {
     navigation.dispatch(
       CommonActions.navigate({
         name: 'MainTabs',
-        params: {
-          screen: 'HomeTab',
-        },
+        params: { screen: 'HomeTab' },
       }),
     );
   };
 
+  /** 저장 */
   const handleSave = async () => {
     try {
       const payload = {
@@ -198,15 +163,9 @@ export default function FaceResultScreen() {
       };
 
       await saveFaceAnalysisResultApi(payload);
-
-      // ✅ 저장 성공 후 홈으로
       goHome();
     } catch (e) {
       console.log('[FaceResult] save error', e);
-      Alert.alert(
-        '저장 실패',
-        '결과 저장에 실패했습니다. 잠시 후 다시 시도해주세요.',
-      );
     }
   };
 
@@ -220,11 +179,7 @@ export default function FaceResultScreen() {
     >
       <Text style={styles.title}>얼굴형 분석 결과</Text>
 
-      {/* =========================================================
-       * ✅ [추가] 상단에 촬영된 얼굴 사진 표시
-       * - photoPath는 기기 로컬 경로라서 uri에 file:// 붙여 표시
-       * ========================================================= */}
-      {photoPath ? (
+      {photoPath && (
         <View style={styles.photoWrap}>
           <Image
             source={{
@@ -233,22 +188,14 @@ export default function FaceResultScreen() {
                 : `file://${photoPath}`,
             }}
             style={styles.photo}
-            resizeMode="cover"
           />
         </View>
-      ) : null}
+      )}
 
-      {/* ✅ Top-2 결과 카드 표시 (원본 ResultCard 컴포넌트 그대로 활용) */}
-      {results.map((r, idx) => (
-        <ResultCard
-          key={idx}
-          label={r.label}
-          percent={r.percent}
-          desc={r.desc}
-        />
+      {results.map((r, i) => (
+        <ResultCard key={i} {...r} />
       ))}
 
-      {/* 액션 버튼 (원본 유지) */}
       <View style={styles.buttonArea}>
         {!isReadOnly && (
           <TouchableOpacity style={styles.primaryButton} onPress={handleSave}>
@@ -264,22 +211,16 @@ export default function FaceResultScreen() {
   );
 }
 
-/* ================= 서브 컴포넌트 (원본 유지) ================= */
+/* ================= ResultCard ================= */
 
-function ResultCard({
-  label,
-  percent,
-  desc,
-}: {
-  label: string;
-  percent: number;
-  desc: string;
-}) {
+function ResultCard({ label, percent, desc }: ResultItem) {
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
         <Text style={styles.cardTitle}>{label}</Text>
-        <Text style={styles.cardPercent}>{percent}%</Text>
+        <Text style={styles.cardPercent}>
+          {percent < 5 ? '5% 미만' : `${percent}%`}
+        </Text>
       </View>
 
       <View style={styles.barBackground}>
@@ -291,15 +232,10 @@ function ResultCard({
   );
 }
 
-/* ================= 스타일 (원본 + 최소 추가) ================= */
+/* ================= Styles (UI 유지) ================= */
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#000',
-    padding: 20,
-  },
-
+  container: { flex: 1, backgroundColor: '#000', padding: 20 },
   title: {
     color: '#FFD400',
     fontSize: 26,
@@ -307,7 +243,6 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
 
-  /* ✅ [추가] 촬영 사진 영역 스타일 */
   photoWrap: {
     borderWidth: 2,
     borderColor: '#FFD400',
@@ -315,10 +250,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginBottom: 16,
   },
-  photo: {
-    width: '100%',
-    height: 260,
-  },
+  photo: { width: '100%', height: 260 },
 
   card: {
     borderWidth: 2,
@@ -327,62 +259,29 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 16,
   },
-
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-
-  cardTitle: {
-    color: '#FFD400',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-
-  cardPercent: {
-    color: '#FFD400',
-    fontSize: 16,
-    fontWeight: '700',
-  },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between' },
+  cardTitle: { color: '#FFD400', fontSize: 18, fontWeight: '700' },
+  cardPercent: { color: '#FFD400', fontSize: 16, fontWeight: '700' },
 
   barBackground: {
     height: 10,
     backgroundColor: '#333',
     borderRadius: 6,
     overflow: 'hidden',
-    marginBottom: 10,
+    marginVertical: 10,
   },
+  barFill: { height: '100%', backgroundColor: '#FFD400' },
 
-  barFill: {
-    height: '100%',
-    backgroundColor: '#FFD400',
-  },
+  cardDesc: { color: '#FFF', fontSize: 14, lineHeight: 20 },
 
-  cardDesc: {
-    color: '#FFF',
-    fontSize: 14,
-    lineHeight: 20,
-  },
-
-  buttonArea: {
-    marginTop: 12,
-    marginBottom: 20,
-    gap: 14,
-  },
-
+  buttonArea: { marginTop: 12, gap: 14 },
   primaryButton: {
     backgroundColor: '#FFD400',
     paddingVertical: 18,
     borderRadius: 30,
     alignItems: 'center',
   },
-
-  primaryText: {
-    color: '#000',
-    fontSize: 18,
-    fontWeight: '800',
-  },
+  primaryText: { color: '#000', fontSize: 18, fontWeight: '800' },
 
   secondaryButton: {
     backgroundColor: '#FFD400',
@@ -390,10 +289,5 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     alignItems: 'center',
   },
-
-  secondaryText: {
-    color: '#000',
-    fontSize: 18,
-    fontWeight: '800',
-  },
+  secondaryText: { color: '#000', fontSize: 18, fontWeight: '800' },
 });

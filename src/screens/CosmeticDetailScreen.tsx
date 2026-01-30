@@ -1,11 +1,9 @@
 /**
- * CosmeticDetailScreen (FINAL STABLE)
+ * CosmeticDetailScreen (FINAL STABLE + EDIT BUTTON)
  * --------------------------------------------------
- * - 시각장애인을 위한 고대비 디자인
- * - Detect 진입 시 뒤로가기 → 인식 결과로 복귀
- * - Android 앱 종료 완전 방지
- * - TabBar 숨김/복구 안정화
- * - 이미지 캐시 최적화 (FastImage + prefetch)
+ * - 원본 구조 유지
+ * - 삭제 버튼 옆에 수정 버튼 추가
+ * - 스크린리더 접근성 강화
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
@@ -25,7 +23,10 @@ import {
   RouteProp,
   useFocusEffect,
 } from '@react-navigation/native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 
 import FastImage from 'react-native-fast-image';
 
@@ -66,61 +67,64 @@ export default function CosmeticDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
-  /* ================= Android Back Handling (Detect 전용) ================= */
+  /* ================= Android Back Handling ================= */
 
   useFocusEffect(
     useCallback(() => {
       if (!fromDetect) return;
 
       const onBackPress = () => {
-        navigation.goBack(); // ✅ Detect 결과 화면으로 복귀
-        return true;         // ❗ 앱 종료 방지
+        navigation.goBack();
+        return true;
       };
 
       const sub = BackHandler.addEventListener(
         'hardwareBackPress',
-        onBackPress
+        onBackPress,
       );
 
       return () => sub.remove();
-    }, [navigation, fromDetect])
+    }, [navigation, fromDetect]),
   );
 
-  /* ================= Fetch ================= */
+  /* ================= Fetch (단일 진입점) ================= */
 
-  useEffect(() => {
-    let alive = true;
+  const fetchDetail = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(false);
 
-    const fetchDetail = async () => {
-      try {
-        const res = await api.get(`/cosmetics/${cosmeticId}`);
-        if (!alive) return;
+      const res = await api.get(`/cosmetics/${cosmeticId}`);
+      setData(res.data);
 
-        setData(res.data);
-
-        // 🔥 이미지 prefetch
-        if (Array.isArray(res.data?.photos)) {
-          res.data.photos.forEach((p: Photo) => {
-            const uri = p.url || p.s3Key;
-            if (uri) {
-              FastImage.preload([{ uri }]);
-            }
-          });
-        }
-      } catch {
-        if (alive) setError(true);
-      } finally {
-        if (alive) setLoading(false);
+      if (Array.isArray(res.data?.photos)) {
+        res.data.photos.forEach((p: Photo) => {
+          const uri = p.url || p.s3Key;
+          if (uri) FastImage.preload([{ uri }]);
+        });
       }
-    };
-
-    fetchDetail();
-    return () => {
-      alive = false;
-    };
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
   }, [cosmeticId]);
 
-  /* ================= 삭제 핸들러 (❗원본 유지) ================= */
+  /* ================= 최초 진입 ================= */
+
+  useEffect(() => {
+    fetchDetail();
+  }, [fetchDetail]);
+
+  /* ================= 수정 후 복귀 시 재조회 ================= */
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchDetail();
+    }, [fetchDetail]),
+  );
+
+  /* ================= 삭제 ================= */
 
   const handleDelete = () => {
     Alert.alert('삭제 확인', '이 화장품을 삭제하시겠습니까?', [
@@ -131,13 +135,21 @@ export default function CosmeticDetailScreen() {
         onPress: async () => {
           try {
             await api.delete(`/cosmetics/${cosmeticId}`);
-            navigation.popToTop(); // 기존 동작 유지
+            navigation.popToTop();
           } catch {
             Alert.alert('삭제 실패', '잠시 후 다시 시도해주세요.');
           }
         },
       },
     ]);
+  };
+
+  /* ================= 수정 이동 ================= */
+
+  const handleEdit = () => {
+    navigation.navigate('CosmeticEdit', {
+      cosmeticId,
+    });
   };
 
   /* ================= Render ================= */
@@ -153,9 +165,7 @@ export default function CosmeticDetailScreen() {
   if (error || !data) {
     return (
       <View style={styles.center}>
-        <Text style={styles.errorText}>
-          화장품 정보를 불러올 수 없습니다.
-        </Text>
+        <Text style={styles.errorText}>화장품 정보를 불러올 수 없습니다.</Text>
       </View>
     );
   }
@@ -174,7 +184,7 @@ export default function CosmeticDetailScreen() {
           <Text style={styles.screenTitle}>화장품 정보</Text>
         </View>
 
-        {/* ===== 화장품명 + 삭제 (❗원본 유지) ===== */}
+        {/* ===== 이름 + 버튼 ===== */}
         <View style={styles.nameRow}>
           <View style={styles.nameContainer}>
             <Text style={styles.cosmeticName}>{data.cosmeticName}</Text>
@@ -184,16 +194,37 @@ export default function CosmeticDetailScreen() {
           </View>
 
           {!fromDetect && (
-            <TouchableOpacity
-              style={styles.deleteIconButton}
-              onPress={handleDelete}
-            >
-              <FastImage
-                source={require('../assets/deleteicon.png')}
-                style={styles.deleteIcon}
-                resizeMode={FastImage.resizeMode.contain}
-              />
-            </TouchableOpacity>
+            <View style={styles.iconButtonGroup}>
+              {/* ✏️ 수정 버튼 */}
+              <TouchableOpacity
+                style={styles.editIconButton}
+                onPress={handleEdit}
+                accessibilityRole="button"
+                accessibilityLabel="화장품 정보 수정"
+                accessibilityHint="화장품 이름과 구매 날짜를 수정할 수 있습니다"
+              >
+                <FastImage
+                  source={require('../assets/editicon.png')}
+                  style={styles.icon}
+                  resizeMode={FastImage.resizeMode.contain}
+                />
+              </TouchableOpacity>
+
+              {/* 🗑️ 삭제 버튼 */}
+              <TouchableOpacity
+                style={styles.deleteIconButton}
+                onPress={handleDelete}
+                accessibilityRole="button"
+                accessibilityLabel="화장품 삭제"
+                accessibilityHint="화장품을 내 파우치에서 삭제합니다"
+              >
+                <FastImage
+                  source={require('../assets/deleteicon.png')}
+                  style={styles.icon}
+                  resizeMode={FastImage.resizeMode.contain}
+                />
+              </TouchableOpacity>
+            </View>
           )}
         </View>
 
@@ -221,7 +252,7 @@ export default function CosmeticDetailScreen() {
   );
 }
 
-/* ================= Styles (변경 없음) ================= */
+/* ================= Styles ================= */
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#000' },
@@ -255,12 +286,27 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   nameContainer: { flex: 1 },
+
   cosmeticName: {
     color: '#FFF',
     fontSize: 28,
     fontWeight: '900',
   },
   date: { color: '#999', fontSize: 14 },
+
+  iconButtonGroup: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+
+  editIconButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.primary, // 🟡 노란색
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 
   deleteIconButton: {
     width: 48,
@@ -270,7 +316,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  deleteIcon: { width: 30, height: 30, tintColor: '#000' },
+
+  icon: { width: 28, height: 28, tintColor: '#000' },
 
   imageSection: { gap: 20 },
   imageCard: {

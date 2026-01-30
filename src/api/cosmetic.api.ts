@@ -58,8 +58,20 @@ export type CosmeticGroupItem = {
 };
 
 export const getMyCosmeticsApi = async (): Promise<CosmeticGroupItem[]> => {
-  const res = await api.get('/cosmetics/me');
-  return res.data;
+  try {
+    const res = await api.get('/cosmetics/me');
+    return res.data;
+  } catch (err: any) {
+    // 🔥 핵심: accessToken 만료(401)는 "데이터 없음"이 아님
+    if (err?.response?.status === 401) {
+      // api.ts가 refresh + retry 처리 중이므로
+      // UI 상태를 절대 변경하면 안 됨
+      throw err;
+    }
+
+    // 그 외 에러만 실제 에러로 처리
+    throw err;
+  }
 };
 
 /* ================= 화장품 상세 ================= */
@@ -142,4 +154,17 @@ export const createCosmeticApi = async ({
   }
 
   return res.json();
+};
+
+/* ================= 화장품 그룹 수정 ================= */
+export const updateCosmeticApi = async (
+  cosmeticId: number,
+  payload: {
+    cosmeticName?: string;
+    createdAt?: string; // ✅ YYYY-MM-DD
+    expiredAt?: string;
+  },
+) => {
+  const res = await api.patch(`/cosmetics/${cosmeticId}`, payload);
+  return res.data;
 };
