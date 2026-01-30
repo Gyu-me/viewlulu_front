@@ -34,6 +34,7 @@ import type { RootStackParamList } from '../navigation/RootNavigator';
 import { startListening, stopListening } from '../voice/voiceListener';
 import { routeVoiceCommand } from '../voice/voiceCommandRouter';
 import { requestMicPermission } from '../voice/requestMicPermission';
+import { ScrollView } from 'react-native';
 
 import PackageIcon from '../assets/packageicon.png';
 import NestClockIcon from '../assets/nestclockicon.png';
@@ -109,7 +110,14 @@ export default function HomeScreen() {
     try {
       const data: CosmeticItem[] = await getMyCosmeticsApi();
 
-      if (!data || data.length === 0) {
+      if (!Array.isArray(data)) {
+        setCount(0);
+        setOver6(0);
+        setOver12(0);
+        return;
+      }
+
+      if (data.length === 0) {
         setCount(0);
         setOver6(0);
         setOver12(0);
@@ -133,8 +141,17 @@ export default function HomeScreen() {
       setCount(data.length);
       setOver6(c6);
       setOver12(c12);
-    } catch {
-      // UI 변경 없음
+    } catch (err: any) {
+      const status = err?.response?.status;
+
+      // 🔥 인증 실패 계열이면 "서버 데이터 없음" 상태로
+      if (status === 401 || status === 403) {
+        setCount(0);
+        setOver6(0);
+        setOver12(0);
+      }
+
+      // 그 외 네트워크 오류는 기존 UI 유지
     }
   }, []);
 
@@ -146,101 +163,111 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.headerRow}>
-        <Text style={styles.title}>ViewLulu</Text>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        <View style={styles.headerRow}>
+          <Text style={styles.title}>ViewLulu</Text>
 
+          {/* 
         <TouchableOpacity
           style={styles.ttsTestButton}
           onPress={startVoiceCommand}
         >
           <Text style={styles.ttsTestText}>🎤 말하기</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* HERO */}
-      <ImageBackground
-        source={HeroBanner}
-        style={styles.heroCard}
-        imageStyle={styles.heroImage}
-      >
-        <View style={styles.heroOverlay} />
-        <View style={styles.heroContent}>
-          <Text style={styles.heroTitle}>나의 눈이 되어주는</Text>
-          <Text style={styles.heroBrand}>뷰루루</Text>
-          <Text style={styles.heroDesc}>
-            화장을 등록하고{'\n'}내 화장품을 한 곳에 확인하세요!
-          </Text>
+        </TouchableOpacity> 
+        */}
         </View>
-      </ImageBackground>
 
-      {/* 얼굴 분석 버튼 */}
-      <View style={styles.analysisRow}>
-        <TouchableOpacity
-          style={[styles.analysisBtn, styles.analysisPrimary]}
-          onPress={() =>
-            navigation.navigate(
-              'FeatureStack' as never,
-              {
-                screen: 'FaceAnalysis',
-              } as never,
-            )
-          }
+        {/* HERO */}
+        <ImageBackground
+          source={HeroBanner}
+          style={styles.heroCard}
+          imageStyle={styles.heroImage}
         >
-          <Text style={styles.analysisTextSmall}>AI 얼굴형</Text>
-          <Text style={styles.analysisText}>분석하기</Text>
-        </TouchableOpacity>
-      </View>
+          <View style={styles.heroOverlay} />
+          <View style={styles.heroContent}>
+            <Text style={styles.heroTitle}>나의 눈이 되어주는</Text>
+            <Text style={styles.heroBrand}>뷰루루</Text>
+            <Text style={styles.heroDesc}>
+              화장을 등록하고{'\n'}내 화장품을 한 곳에 확인하세요!
+            </Text>
+          </View>
+        </ImageBackground>
 
-      {/* 파우치 요약 */}
-      <View style={styles.summaryCard}>
-        <Text style={styles.summaryTitle}>내 파우치 요약</Text>
-
-        <View style={styles.summaryRow}>
-          <SummaryItem
-            label="전체"
-            value={count}
-            icon={PackageIcon}
-            iconColor={colors.primary}
+        {/* 얼굴 분석 버튼 */}
+        <View style={styles.analysisRow}>
+          <TouchableOpacity
+            style={[styles.analysisBtn, styles.analysisPrimary]}
             onPress={() =>
-              navigation.navigate('MyPouchTab', {
-                screen: 'MyPouch',
-                params: { filter: 'ALL' },
-              })
+              navigation.navigate(
+                'FeatureStack' as never,
+                {
+                  screen: 'FaceAnalysis',
+                } as never,
+              )
             }
-          />
-
-          <SummaryItem
-            label="6개월"
-            value={over6}
-            icon={NestClockIcon}
-            iconColor="#FF9F0A"
-            onPress={() =>
-              navigation.navigate('MyPouchTab', {
-                screen: 'MyPouch',
-                params: { filter: 'OVER_6' },
-              })
-            }
-          />
-
-          <SummaryItem
-            label="12개월"
-            value={over12}
-            icon={AlertIcon}
-            iconColor="#FF453A"
-            onPress={() =>
-              navigation.navigate('MyPouchTab', {
-                screen: 'MyPouch',
-                params: { filter: 'OVER_12' },
-              })
-            }
-          />
+          >
+            <Text style={styles.analysisTextSmall}>AI 얼굴형</Text>
+            <Text style={styles.analysisText}>분석하기</Text>
+          </TouchableOpacity>
         </View>
-      </View>
+
+        {/* 파우치 요약 */}
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryTitle}>내 파우치 요약</Text>
+
+          <View style={styles.summaryRow}>
+            <SummaryItem
+              label="전체"
+              value={count}
+              icon={PackageIcon}
+              iconColor={colors.primary}
+              onPress={() =>
+                navigation.navigate('MyPouchTab', {
+                  screen: 'MyPouch',
+                  params: { filter: 'ALL' },
+                })
+              }
+            />
+
+            <SummaryItem
+              label="6개월"
+              value={over6}
+              icon={NestClockIcon}
+              iconColor="#FF9F0A"
+              onPress={() =>
+                navigation.navigate('MyPouchTab', {
+                  screen: 'MyPouch',
+                  params: { filter: 'OVER_6' },
+                })
+              }
+            />
+
+            <SummaryItem
+              label="12개월"
+              value={over12}
+              icon={AlertIcon}
+              iconColor="#FF453A"
+              onPress={() =>
+                navigation.navigate('MyPouchTab', {
+                  screen: 'MyPouch',
+                  params: { filter: 'OVER_12' },
+                })
+              }
+            />
+          </View>
+        </View>
+      </ScrollView>
 
       {/* 하단 Detect */}
       <View style={styles.fabGlow}>
         <TouchableOpacity
           style={styles.fab}
+          accessibilityRole="button"
+          accessibilityLabel="화장품 인식하기"
+          accessibilityHint="카메라로 화장품을 촬영하여 인식합니다"
           onPress={() =>
             navigation.navigate('CaptureStack', {
               screen: 'CosmeticDetect',
@@ -290,11 +317,11 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontSize: 28,
     fontWeight: '800',
-    marginBottom: 24,
+    marginBottom: 8,
   },
 
   heroCard: {
-    height: 240,
+    height: 210,
     borderRadius: 28,
     backgroundColor: '#1A1A1A',
     marginBottom: 24,
@@ -378,6 +405,23 @@ const styles = StyleSheet.create({
   summaryLabel: {
     color: 'rgba(255,255,255,0.5)',
     marginTop: 4,
+  },
+  scrollContent: {
+    paddingBottom: 140, // 🔥 FAB + 여유 공간
+  },
+
+  fabContainer: {
+    position: 'absolute',
+    bottom: 20,
+    alignSelf: 'center',
+    alignItems: 'center',
+  },
+
+  fabLabel: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 6,
   },
 
   fabGlow: {
