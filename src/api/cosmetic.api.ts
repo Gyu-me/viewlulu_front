@@ -143,3 +143,16 @@ export const createCosmeticApi = async ({
 
   return res.json();
 };
+
+/* ================= 화장품 그룹 수정 ================= */
+export const updateCosmeticApi = async (
+  cosmeticId: number,
+  payload: {
+    cosmeticName?: string;
+    createdAt?: string; // ✅ YYYY-MM-DD
+    expiredAt?: string;
+  },
+) => {
+  const res = await api.patch(`/cosmetics/${cosmeticId}`, payload);
+  return res.data;
+};

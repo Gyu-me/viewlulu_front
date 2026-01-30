@@ -51,7 +51,7 @@ export default function CosmeticEditScreen() {
   const [saving, setSaving] = useState(false);
 
   const [name, setName] = useState('');
-  const [purchaseDate, setPurchaseDate] = useState('');
+  const [createdAt, setCreatedAt] = useState('');
 
   /* ================= Fetch ================= */
 
@@ -66,7 +66,7 @@ export default function CosmeticEditScreen() {
         const data: CosmeticDetail = res.data;
 
         setName(data.cosmeticName);
-        setPurchaseDate(
+        setCreatedAt(
           data.purchaseDate ?? data.createdAt.slice(0, 10), // YYYY-MM-DD
         );
 
@@ -101,7 +101,7 @@ export default function CosmeticEditScreen() {
     try {
       await api.patch(`/cosmetics/${cosmeticId}`, {
         cosmeticName: name.trim(),
-        purchaseDate,
+        createdAt,
       });
 
       AccessibilityInfo.announceForAccessibility(
@@ -158,8 +158,8 @@ export default function CosmeticEditScreen() {
         <Text style={styles.label}>구매 날짜</Text>
         <TextInput
           style={styles.input}
-          value={purchaseDate}
-          onChangeText={setPurchaseDate}
+          value={createdAt}
+          onChangeText={setCreatedAt}
           placeholder="YYYY-MM-DD"
           accessibilityLabel="구매 날짜 입력"
           accessibilityHint="연도-월-일 형식으로 입력해주세요"

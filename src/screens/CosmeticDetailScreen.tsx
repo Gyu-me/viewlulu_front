@@ -87,36 +87,42 @@ export default function CosmeticDetailScreen() {
     }, [navigation, fromDetect]),
   );
 
-  /* ================= Fetch ================= */
+  /* ================= Fetch (단일 진입점) ================= */
+
+  const fetchDetail = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(false);
+
+      const res = await api.get(`/cosmetics/${cosmeticId}`);
+      setData(res.data);
+
+      if (Array.isArray(res.data?.photos)) {
+        res.data.photos.forEach((p: Photo) => {
+          const uri = p.url || p.s3Key;
+          if (uri) FastImage.preload([{ uri }]);
+        });
+      }
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [cosmeticId]);
+
+  /* ================= 최초 진입 ================= */
 
   useEffect(() => {
-    let alive = true;
-
-    const fetchDetail = async () => {
-      try {
-        const res = await api.get(`/cosmetics/${cosmeticId}`);
-        if (!alive) return;
-
-        setData(res.data);
-
-        if (Array.isArray(res.data?.photos)) {
-          res.data.photos.forEach((p: Photo) => {
-            const uri = p.url || p.s3Key;
-            if (uri) FastImage.preload([{ uri }]);
-          });
-        }
-      } catch {
-        if (alive) setError(true);
-      } finally {
-        if (alive) setLoading(false);
-      }
-    };
-
     fetchDetail();
-    return () => {
-      alive = false;
-    };
-  }, [cosmeticId]);
+  }, [fetchDetail]);
+
+  /* ================= 수정 후 복귀 시 재조회 ================= */
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchDetail();
+    }, [fetchDetail]),
+  );
 
   /* ================= 삭제 ================= */
 
