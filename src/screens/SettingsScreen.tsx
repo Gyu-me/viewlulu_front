@@ -115,7 +115,13 @@ export default function SettingsScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
-      <Text style={styles.title}>설정</Text>
+      <Text
+        style={styles.title}
+        accessibilityRole="header"
+        accessibilityLabel="설정 화면"
+      >
+        설정
+      </Text>
 
       {/* ================= Voice Wake =================
       <Text style={styles.sectionTitle}>음성 기능</Text>
@@ -135,17 +141,35 @@ export default function SettingsScreen() {
       </Text> */}
 
       {/* ================= App Info ================= */}
-      <Text style={styles.sectionTitle}>앱 정보</Text>
+      <Text style={styles.sectionTitle} accessibilityRole="header">
+        앱 정보
+      </Text>
 
-      <View style={styles.settingCard}>
-        <Text style={styles.settingTitle}>버전</Text>
-        <Text style={styles.settingValue}>v2.0.0</Text>
+      <View
+        style={styles.settingCard}
+        accessibilityRole="text"
+        accessibilityLabel="앱 버전, 2.0.0"
+      >
+        <Text style={styles.settingTitle} accessible={false}>
+          버전
+        </Text>
+        <Text style={styles.settingValue} accessible={false}>
+          v2.0.0
+        </Text>
       </View>
 
       {/* ================= Account ================= */}
-      <Text style={styles.sectionTitle}>계정</Text>
+      <Text style={styles.sectionTitle} accessibilityRole="header">
+        계정
+      </Text>
 
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+      <TouchableOpacity
+        style={styles.logoutButton}
+        onPress={handleLogout}
+        accessibilityRole="button"
+        accessibilityLabel="로그아웃"
+        accessibilityHint="계정에서 로그아웃하고 로그인 화면으로 이동합니다"
+      >
         <Text style={styles.logoutText}>로그아웃</Text>
       </TouchableOpacity>
     </ScrollView>

@@ -181,14 +181,28 @@ export default function CosmeticDetailScreen() {
       >
         {/* ===== 상단 타이틀 ===== */}
         <View style={styles.headerSection}>
-          <Text style={styles.screenTitle}>화장품 정보</Text>
+          <Text
+            style={styles.screenTitle}
+            accessibilityRole="header"
+            accessibilityLabel="화장품 정보 화면"
+          >
+            화장품 정보
+          </Text>
         </View>
 
         {/* ===== 이름 + 버튼 ===== */}
         <View style={styles.nameRow}>
-          <View style={styles.nameContainer}>
-            <Text style={styles.cosmeticName}>{data.cosmeticName}</Text>
-            <Text style={styles.date}>
+          <View
+            style={styles.nameContainer}
+            accessibilityRole="text"
+            accessibilityLabel={`${data.cosmeticName}, 등록일 ${new Date(
+              data.createdAt,
+            ).toLocaleDateString()}`}
+          >
+            <Text style={styles.cosmeticName} accessible={false}>
+              {data.cosmeticName}
+            </Text>
+            <Text style={styles.date} accessible={false}>
               등록일 · {new Date(data.createdAt).toLocaleDateString()}
             </Text>
           </View>
@@ -207,6 +221,7 @@ export default function CosmeticDetailScreen() {
                   source={require('../assets/editicon.png')}
                   style={styles.icon}
                   resizeMode={FastImage.resizeMode.contain}
+                  accessible={false}
                 />
               </TouchableOpacity>
 
@@ -222,6 +237,7 @@ export default function CosmeticDetailScreen() {
                   source={require('../assets/deleteicon.png')}
                   style={styles.icon}
                   resizeMode={FastImage.resizeMode.contain}
+                  accessible={false}
                 />
               </TouchableOpacity>
             </View>
@@ -229,19 +245,20 @@ export default function CosmeticDetailScreen() {
         </View>
 
         {/* ===== 이미지 ===== */}
-        <View style={styles.imageSection}>
+        <View
+          style={styles.imageSection}
+          accessibilityRole="text"
+          accessibilityLabel={`화장품 이미지 ${data.photos.length}장`}
+        >
           {data.photos.map(p => {
             const uri = p.url || p.s3Key;
             return (
-              <View key={p.s3Key} style={styles.imageCard}>
+              <View key={p.s3Key} style={styles.imageCard} accessible={false}>
                 <FastImage
-                  source={{
-                    uri,
-                    priority: FastImage.priority.normal,
-                    cache: FastImage.cacheControl.web,
-                  }}
+                  source={{ uri }}
                   style={styles.image}
                   resizeMode={FastImage.resizeMode.cover}
+                  accessible={false}
                 />
               </View>
             );

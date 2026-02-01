@@ -236,7 +236,12 @@ export default function RootNavigator() {
         component={LoginScreen}
         options={{ headerShown: false }}
       />
-      <RootStack.Screen name="Register" component={RegisterScreen} />
+
+      <RootStack.Screen
+        name="Register"
+        component={RegisterScreen}
+        options={{ headerShown: false }}
+      />
     </RootStack.Navigator>
   );
 }
