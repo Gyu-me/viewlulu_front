@@ -168,7 +168,13 @@ export default function HomeScreen() {
         contentContainerStyle={styles.scrollContent}
       >
         <View style={styles.headerRow}>
-          <Text style={styles.title}>ViewLulu</Text>
+          <Text
+            style={styles.title}
+            accessibilityRole="header"
+            accessibilityLabel="홈 화면"
+          >
+            ViewLulu
+          </Text>
 
           {/* 
         <TouchableOpacity
@@ -191,7 +197,7 @@ export default function HomeScreen() {
             <Text style={styles.heroTitle}>나의 눈이 되어주는</Text>
             <Text style={styles.heroBrand}>뷰루루</Text>
             <Text style={styles.heroDesc}>
-              화장을 등록하고{'\n'}내 화장품을 한 곳에 확인하세요!
+              화장품을 등록하고{'\n'}내 화장품을 한 곳에 확인하세요!
             </Text>
           </View>
         </ImageBackground>
@@ -208,6 +214,9 @@ export default function HomeScreen() {
                 } as never,
               )
             }
+            accessibilityRole="button"
+            accessibilityLabel="AI 얼굴형 분석하기"
+            accessibilityHint="카메라로 얼굴을 촬영하여 얼굴형을 분석합니다"
           >
             <Text style={styles.analysisTextSmall}>AI 얼굴형</Text>
             <Text style={styles.analysisText}>분석하기</Text>
@@ -216,7 +225,9 @@ export default function HomeScreen() {
 
         {/* 파우치 요약 */}
         <View style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>내 파우치 요약</Text>
+          <Text style={styles.summaryTitle} accessibilityRole="header">
+            내 파우치 요약
+          </Text>
 
           <View style={styles.summaryRow}>
             <SummaryItem
@@ -296,11 +307,21 @@ const SummaryItem = ({
   iconColor: string;
   onPress: () => void;
 }) => (
-  <TouchableOpacity style={styles.summaryItem} onPress={onPress}>
+  <TouchableOpacity
+    style={styles.summaryItem}
+    onPress={onPress}
+    accessibilityRole="button"
+    accessibilityLabel={`${label} 화장품 ${value}개`}
+    accessibilityHint="해당 화장품 목록으로 이동합니다"
+  >
+    {/* 아이콘은 장식용 → 스크린리더 제외 */}
     <Image
       source={icon}
       style={[styles.summaryIcon, { tintColor: iconColor }]}
+      accessible={false}
     />
+
+    {/* 숫자 / 라벨은 시각용 */}
     <Text style={styles.summaryValue}>{value}</Text>
     <Text style={styles.summaryLabel}>{label}</Text>
   </TouchableOpacity>

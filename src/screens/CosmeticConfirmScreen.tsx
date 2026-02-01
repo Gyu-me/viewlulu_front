@@ -26,6 +26,7 @@ import {
 import { createCosmeticApi } from '../api/cosmetic.api';
 import { colors } from '../theme/colors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AccessibilityInfo } from 'react-native';
 
 type Route = RouteProp<
   { CosmeticConfirm: { photos: string[] } },
@@ -46,10 +47,17 @@ export default function CosmeticConfirmScreen() {
   const allowRemoveRef = useRef(false);
   const isSavingRef = useRef(false);
 
+  // 시작 인트로
+  useEffect(() => {
+    AccessibilityInfo.announceForAccessibility(
+      '화장품 정보 확인 화면입니다. 사진을 확인하고 화장품 이름을 입력한 뒤 저장할 수 있습니다.',
+    );
+  }, []);
+
   /* ================= Back Intercept ================= */
 
   useEffect(() => {
-    const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+    const unsubscribe = navigation.addListener('beforeRemove', e => {
       if (allowRemoveRef.current) return;
 
       e.preventDefault();
@@ -67,7 +75,7 @@ export default function CosmeticConfirmScreen() {
           },
           { text: '취소', style: 'destructive' },
         ],
-        { cancelable: false }
+        { cancelable: false },
       );
     });
 
@@ -88,9 +96,8 @@ export default function CosmeticConfirmScreen() {
           tabBarStyle: undefined, // ✅ Root(MainTabs) 기준으로 복구
         });
       };
-    }, [navigation])
+    }, [navigation]),
   );
-
 
   /* ================= Save ================= */
 
@@ -133,9 +140,7 @@ export default function CosmeticConfirmScreen() {
                 {
                   name: 'MainTabs',
                   state: {
-                    routes: [
-                      { name: 'MyPouch', params: { refresh: true } },
-                    ],
+                    routes: [{ name: 'MyPouch', params: { refresh: true } }],
                   },
                 },
               ],
@@ -143,12 +148,11 @@ export default function CosmeticConfirmScreen() {
           },
         },
       ]);
-
     } catch (e: any) {
       console.log('🔥 [Confirm] save error:', e);
       Alert.alert(
         '저장 실패',
-        e?.message ? String(e.message) : '잠시 후 다시 시도해주세요.'
+        e?.message ? String(e.message) : '잠시 후 다시 시도해주세요.',
       );
     } finally {
       setLoading(false);
@@ -167,18 +171,37 @@ export default function CosmeticConfirmScreen() {
         ref={scrollRef}
         style={styles.container}
         contentContainerStyle={{
-          paddingTop: insets.top + 24,   // 🔥 Register / Home과 동일
+          paddingTop: insets.top + 24, // 🔥 Register / Home과 동일
           paddingBottom: 40 + insets.bottom,
         }}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.title}>화장품 정보 확인</Text>
+        <Text
+          style={styles.title}
+          accessibilityRole="header"
+          accessibilityLabel="화장품 정보 확인 화면"
+        >
+          화장품 정보 확인
+        </Text>
 
-        <View style={styles.grid}>
+        <View
+          style={styles.grid}
+          accessibilityRole="text"
+          accessibilityLabel={`촬영한 화장품 사진 ${photos.length}장`}
+        >
           {photos.slice(0, 4).map((uri, idx) => (
-            <Image key={idx} source={{ uri }} style={styles.gridImage} />
+            <Image
+              key={idx}
+              source={{ uri }}
+              style={styles.gridImage}
+              accessible={false}
+            />
           ))}
         </View>
+
+        <Text style={styles.label} accessibilityElementsHidden>
+          화장품 이름
+        </Text>
 
         <TextInput
           style={styles.input}
@@ -186,6 +209,9 @@ export default function CosmeticConfirmScreen() {
           placeholderTextColor="#777"
           value={name}
           onChangeText={setName}
+          accessibilityLabel="화장품 이름 입력, 필수 항목"
+          accessibilityHint="화장품 이름을 입력해야 저장할 수 있습니다"
+          returnKeyType="done"
           onFocus={() => {
             setTimeout(() => {
               scrollRef.current?.scrollToEnd({ animated: true });
@@ -197,10 +223,12 @@ export default function CosmeticConfirmScreen() {
           style={[styles.saveButton, loading && { opacity: 0.6 }]}
           onPress={handleSave}
           disabled={loading}
+          accessibilityRole="button"
+          accessibilityLabel="화장품 저장"
+          accessibilityHint="입력한 이름과 사진으로 화장품을 저장합니다"
+          accessibilityState={{ disabled: loading }}
         >
-          <Text style={styles.saveText}>
-            {loading ? '저장 중...' : '저장'}
-          </Text>
+          <Text style={styles.saveText}>{loading ? '저장 중...' : '저장'}</Text>
         </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>

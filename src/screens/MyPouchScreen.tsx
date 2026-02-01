@@ -154,7 +154,7 @@ export default function MyPouchScreen() {
       (now.getFullYear() - created.getFullYear()) * 12 +
       (now.getMonth() - created.getMonth());
 
-    if (filter === 'OVER_6') return diffMonths >= 6;
+    if (filter === 'OVER_6') return diffMonths >= 6 && diffMonths < 12;
     if (filter === 'OVER_12') return diffMonths >= 12;
 
     return true;
@@ -197,12 +197,21 @@ export default function MyPouchScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>내 파우치</Text>
+      <Text
+        style={styles.title}
+        accessibilityRole="header"
+        accessibilityLabel="내 파우치 화면"
+      >
+        내 파우치
+      </Text>
 
       <TouchableOpacity
         style={styles.primaryButton}
         activeOpacity={0.9}
         onPress={goRegister}
+        accessibilityRole="button"
+        accessibilityLabel="화장품 등록하기"
+        accessibilityHint="새로운 화장품을 카메라로 등록합니다"
       >
         <Text style={styles.primaryButtonText}>화장품 등록</Text>
       </TouchableOpacity>
@@ -237,15 +246,16 @@ export default function MyPouchScreen() {
             <TouchableOpacity
               style={styles.card}
               onPress={() => goDetail(item.groupId)}
+              accessibilityRole="button"
+              accessibilityLabel={`${item.cosmeticName}, 등록일 ${new Date(
+                item.createdAt,
+              ).toLocaleDateString()}`}
+              accessibilityHint="화장품 상세 정보로 이동합니다"
             >
-              <View style={styles.thumbWrap}>
+              <View style={styles.thumbWrap} accessible={false}>
                 {uri ? (
                   <FastImage
-                    source={{
-                      uri,
-                      priority: FastImage.priority.normal,
-                      cache: FastImage.cacheControl.immutable,
-                    }}
+                    source={{ uri, priority: FastImage.priority.normal }}
                     style={styles.thumb}
                     resizeMode={FastImage.resizeMode.cover}
                   />
@@ -256,7 +266,7 @@ export default function MyPouchScreen() {
                 )}
               </View>
 
-              <View style={styles.cardInfo}>
+              <View style={styles.cardInfo} accessible={false}>
                 <Text style={styles.cardTitle} numberOfLines={1}>
                   {item.cosmeticName}
                 </Text>
@@ -267,6 +277,8 @@ export default function MyPouchScreen() {
             </TouchableOpacity>
           );
         }}
+        accessibilityRole="list"
+        accessibilityLabel="화장품 목록"
       />
     </View>
   );
@@ -286,6 +298,10 @@ const FilterButton = ({
   <TouchableOpacity
     onPress={onPress}
     style={[styles.filterButton, active && styles.filterButtonActive]}
+    accessibilityRole="button"
+    accessibilityLabel={`필터 ${label}`}
+    accessibilityState={{ selected: active }}
+    accessibilityHint="화장품 목록을 이 조건으로 필터링합니다"
   >
     <Text style={[styles.filterText, active && styles.filterTextActive]}>
       {label}

@@ -23,7 +23,11 @@ import {
   useCameraDevice,
   useCameraPermission,
 } from 'react-native-vision-camera';
-import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
+import {
+  useNavigation,
+  useFocusEffect,
+  useRoute,
+} from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 /* ================= Constants ================= */
@@ -81,9 +85,8 @@ export default function CosmeticRegisterScreen() {
           tabBarStyle: undefined,
         });
       };
-    }, [navigation])
+    }, [navigation]),
   );
-
 
   /* ================= Reset (Confirm → Register) ================= */
 
@@ -97,7 +100,7 @@ export default function CosmeticRegisterScreen() {
         setIsActive(true);
         navigation.setParams({ reset: false });
       }
-    }, [route.params?.reset, navigation])
+    }, [route.params?.reset, navigation]),
   );
 
   /* ================= Back Handling ================= */
@@ -136,7 +139,6 @@ export default function CosmeticRegisterScreen() {
     return unsubscribe;
   }, [navigation]);
 
-
   /* ================= TabBar Hide ================= */
 
   useFocusEffect(
@@ -151,15 +153,14 @@ export default function CosmeticRegisterScreen() {
           tabBarStyle: { display: 'flex' },
         });
       };
-    }, [navigation])
+    }, [navigation]),
   );
 
   /* ================= Capture ================= */
 
   const currentIndex = photos.length;
   const currentGuide =
-    CAPTURE_GUIDE[currentIndex] ??
-    CAPTURE_GUIDE[CAPTURE_GUIDE.length - 1];
+    CAPTURE_GUIDE[currentIndex] ?? CAPTURE_GUIDE[CAPTURE_GUIDE.length - 1];
 
   const handleCapture = async () => {
     if (
@@ -203,7 +204,10 @@ export default function CosmeticRegisterScreen() {
     return (
       <View style={styles.center}>
         <Text style={styles.permissionText}>카메라 권한이 필요합니다.</Text>
-        <TouchableOpacity style={styles.permissionBtn} onPress={requestPermission}>
+        <TouchableOpacity
+          style={styles.permissionBtn}
+          onPress={requestPermission}
+        >
           <Text style={styles.permissionBtnText}>권한 허용</Text>
         </TouchableOpacity>
       </View>

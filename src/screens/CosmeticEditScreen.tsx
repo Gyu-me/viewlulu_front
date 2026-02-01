@@ -125,6 +125,17 @@ export default function CosmeticEditScreen() {
     navigation.goBack();
   };
 
+  /* ================= 날짜 자동 하이픈 함수 ================= */
+  const formatDateInput = (text: string) => {
+    // 숫자만 남기기
+    const digits = text.replace(/\D/g, '').slice(0, 8);
+
+    if (digits.length <= 4) return digits;
+    if (digits.length <= 6) return `${digits.slice(0, 4)}-${digits.slice(4)}`;
+
+    return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6)}`;
+  };
+
   /* ================= Render ================= */
 
   if (loading) {
@@ -149,22 +160,29 @@ export default function CosmeticEditScreen() {
           style={styles.input}
           value={name}
           onChangeText={setName}
-          accessibilityLabel="화장품 이름 입력"
-          accessibilityHint="화장품의 이름을 수정할 수 있습니다"
-          returnKeyType="done"
+          accessibilityLabel="화장품 이름"
+          accessibilityHint="화장품 이름을 수정하세요"
+          returnKeyType="next"
         />
 
-        {/* ===== 구매 날짜 ===== */}
-        <Text style={styles.label}>구매 날짜</Text>
+        <Text style={styles.label}>구매 날짜 (선택)</Text>
+
         <TextInput
           style={styles.input}
           value={createdAt}
-          onChangeText={setCreatedAt}
+          onChangeText={text => setCreatedAt(formatDateInput(text))}
           placeholder="YYYY-MM-DD"
+          keyboardType="number-pad"
+          maxLength={10}
           accessibilityLabel="구매 날짜 입력"
-          accessibilityHint="연도-월-일 형식으로 입력해주세요"
+          accessibilityHint="숫자만 입력하세요. 연도 네 자리, 월 두 자리, 일 두 자리 순서입니다"
+          returnKeyType="done"
         />
-        <Text style={styles.helper}>예시: 2024-03-15</Text>
+
+        <Text style={styles.helper} accessibilityElementsHidden>
+          해당 날짜는 본래 촬영일을 기준으로 저장됩니다. 구매 날짜나 개봉일을
+          알고 있다면 수정해주세요!
+        </Text>
 
         {/* ===== 버튼 ===== */}
         <View style={styles.buttonGroup}>
