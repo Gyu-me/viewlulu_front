@@ -11,7 +11,7 @@ let currentRate = 0.45;
 export async function initTTS() {
   try {
     await Tts.setDefaultLanguage('ko-KR');
-    await Tts.setDefaultRate(0.45);
+    await Tts.setDefaultRate(0.75, true);
     await Tts.setDefaultPitch(1.0);
     ttsReady = true;
 
@@ -29,9 +29,9 @@ export async function initTTS() {
 }
 
 /** 🔥 추가: 음성 속도 변경 */
-export function setTtsRate(rate: number) {
+export function setTtsRate(rate) {
   currentRate = rate;
-  Tts.setDefaultRate(rate);
+  Tts.setDefaultRate(rate, true);
 }
 
 /**
@@ -50,8 +50,18 @@ export function speak(text: string) {
 /**
  * 화면 설명 전용
  */
-export function announceScreen(title: string, guide?: string) {
-  const message = guide ? `${title}. ${guide}` : `${title}.`;
+export function announceScreen(title?: string, guide?: string) {
+  const parts: string[] = [];
+
+  if (title && title.trim().length > 0) {
+    parts.push(title.trim());
+  }
+
+  if (guide && guide.trim().length > 0) {
+    parts.push(guide.trim());
+  }
+
+  const message = parts.join(' ');
   speak(message);
 }
 

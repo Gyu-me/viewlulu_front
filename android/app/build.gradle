@@ -32,6 +32,19 @@ android {
     }
 
     /**
+     * 🔥 JVM 타깃 통일 (핵심 수정)
+     * Java 17 ↔ Kotlin 17
+     */
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+
+    /**
      * 🔐 Signing Configs
      */
     signingConfigs {
@@ -78,6 +91,8 @@ android {
 
 dependencies {
     implementation("com.facebook.react:react-android")
+
+    // 얼굴형 분석
     implementation 'org.tensorflow:tensorflow-lite:2.13.0'
     implementation 'com.google.mlkit:face-detection:16.1.6'
 
