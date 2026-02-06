@@ -1,6 +1,7 @@
 package com.viewluluapp.mlkit
 
-import android.graphics.BitmapFactory
+import android.net.Uri
+import android.util.Log
 import com.facebook.react.bridge.*
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.FaceDetection
@@ -21,28 +22,32 @@ class FaceDetectorModule(reactContext: ReactApplicationContext) :
                 return
             }
 
-            val bitmap = BitmapFactory.decodeFile(photoPath)
-            if (bitmap == null) {
-                promise.reject("DECODE_FAILED", "Failed to decode bitmap: $photoPath")
-                return
-            }
+            Log.i("FaceDetector", "detectFaces file=$photoPath")
+
+            // ✅ ML Kit 정석: 파일 직접 전달
+            val image = InputImage.fromFilePath(
+                reactApplicationContext,
+                Uri.fromFile(file)
+            )
 
             val options = FaceDetectorOptions.Builder()
                 .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
                 .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_NONE)
                 .setContourMode(FaceDetectorOptions.CONTOUR_MODE_NONE)
                 .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_NONE)
+                .setMinFaceSize(0.12f) // 🔥 중요
                 .enableTracking()
                 .build()
 
             val detector = FaceDetection.getClient(options)
-            val image = InputImage.fromBitmap(bitmap, 0)
 
             detector.process(image)
                 .addOnSuccessListener { faces ->
+                    Log.i("FaceDetector", "faces.size=${faces.size}")
+
                     val result = Arguments.createMap()
-                    result.putInt("imageWidth", bitmap.width)
-                    result.putInt("imageHeight", bitmap.height)
+                    result.putInt("imageWidth", image.width)
+                    result.putInt("imageHeight", image.height)
 
                     val faceArray = Arguments.createArray()
                     for (face in faces) {
@@ -55,8 +60,8 @@ class FaceDetectorModule(reactContext: ReactApplicationContext) :
                         b.putDouble("height", face.boundingBox.height().toDouble())
                         m.putMap("bounds", b)
 
-                        m.putDouble("headEulerAngleY", face.headEulerAngleY.toDouble()) // yaw
-                        m.putDouble("headEulerAngleZ", face.headEulerAngleZ.toDouble()) // roll
+                        m.putDouble("headEulerAngleY", face.headEulerAngleY.toDouble())
+                        m.putDouble("headEulerAngleZ", face.headEulerAngleZ.toDouble())
 
                         faceArray.pushMap(m)
                     }
@@ -69,6 +74,7 @@ class FaceDetectorModule(reactContext: ReactApplicationContext) :
                     detector.close()
                     promise.reject("MLKIT_FAILED", e)
                 }
+
         } catch (e: Exception) {
             promise.reject("UNEXPECTED", e)
         }

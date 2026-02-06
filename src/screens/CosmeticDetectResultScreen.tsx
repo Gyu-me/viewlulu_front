@@ -1,16 +1,5 @@
 /**
- * CosmeticDetectResultScreen (🔥 CaptureStack 종료 기준 최종본)
- * --------------------------------------------------
- * ✅ cosmeticId 기반 서버 조회
- * ✅ 화면 이탈 시 상태 완전 초기화
- * ✅ 잘못된 진입 / 서버 오류 / 재진입 모두 방어
- * ✅ 🔥 뒤로가기 시 앱 종료 방지 (무조건 MyPouch)
- *
- * ♿ 접근성 개선 (시각장애인 UX)
- * - 인식 결과 로딩 완료 후 1회 TTS로 결과 요약 안내
- *   → "이 화장품은 ○○○ 입니다."
- * - 결과 화면에서는 스크린리더 허용
- * - 상단 제목(header) + 버튼(role=button) 중심 탐색
+ * CosmeticDetectResultScreen (🔥 CaptureStack 종료 기준 최종본 + UI 확장)
  */
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
@@ -22,6 +11,7 @@ import {
   ActivityIndicator,
   Alert,
   BackHandler,
+  Image,
 } from 'react-native';
 import {
   RouteProp,
@@ -51,10 +41,10 @@ export default function CosmeticDetectResultScreen() {
   const [loading, setLoading] = useState(true);
   const [cosmetic, setCosmetic] = useState<CosmeticDetail | null>(null);
 
-  /** 🔊 결과 TTS 1회 실행 여부 */
   const hasSpokenRef = useRef(false);
+  const hasErrorSpokenRef = useRef(false);
 
-  /* ================= 🔥 Back Handling (무조건 MyPouch) ================= */
+  /* ================= Back Handling ================= */
   useFocusEffect(
     useCallback(() => {
       const onBackPress = () => {
@@ -63,9 +53,7 @@ export default function CosmeticDetectResultScreen() {
           routes: [
             {
               name: 'MainTabs',
-              state: {
-                routes: [{ name: 'HomeTab' }],
-              },
+              state: { routes: [{ name: 'HomeTab' }] },
             },
           ],
         });
@@ -110,49 +98,47 @@ export default function CosmeticDetectResultScreen() {
     };
   }, [cosmeticId]);
 
-  /* ================= 🔊 Result TTS (요약 1회 + 접근성 잠금) ================= */
+  /* ================= Result TTS ================= */
   useEffect(() => {
-    if (!cosmetic) return;
-    if (hasSpokenRef.current) return;
+    if (!cosmetic || hasSpokenRef.current) return;
 
     const name = cosmetic.cosmeticName || cosmetic.name;
     if (!name) return;
 
     hasSpokenRef.current = true;
-
-    // 🔒 TTS 동안 스크린리더 잠금
     setScreenReaderEnabled(false);
 
     Tts.stop();
     Tts.speak(`이 화장품은 ${name} 입니다.`);
   }, [cosmetic]);
 
-  /* ================= 🔊 TTS 종료 시 접근성 해제 ================= */
+  //없어용
   useEffect(() => {
-    const onFinish = () => {
-      setScreenReaderEnabled(true);
-    };
+    if (loading) return;
+    if (cosmetic) return;
+    if (hasErrorSpokenRef.current) return;
 
-    const subscription = Tts.addEventListener('tts-finish', onFinish);
+    hasErrorSpokenRef.current = true;
 
-    return () => {
-      subscription?.remove();
-    };
+    setScreenReaderEnabled(false);
+    Tts.stop();
+    Tts.speak(
+      '화장품 정보를 불러올 수 없습니다. 홈으로 돌아가기를 눌러주세요.',
+    );
+  }, [loading, cosmetic]);
+
+  useEffect(() => {
+    const onFinish = () => setScreenReaderEnabled(true);
+    const sub = Tts.addEventListener('tts-finish', onFinish);
+    return () => sub?.remove();
   }, []);
 
-  /* ================= Navigation Helpers ================= */
+  /* ================= Navigation ================= */
 
   const exitToMain = () => {
     navigation.reset({
       index: 0,
-      routes: [
-        {
-          name: 'MainTabs',
-          state: {
-            routes: [{ name: 'HomeTab' }],
-          },
-        },
-      ],
+      routes: [{ name: 'MainTabs', state: { routes: [{ name: 'HomeTab' }] } }],
     });
   };
 
@@ -163,10 +149,7 @@ export default function CosmeticDetectResultScreen() {
       screen: 'MyPouchTab',
       params: {
         screen: 'CosmeticDetail',
-        params: {
-          cosmeticId,
-          fromDetect: true,
-        },
+        params: { cosmeticId, fromDetect: true },
       },
     });
   };
@@ -175,20 +158,12 @@ export default function CosmeticDetectResultScreen() {
 
   if (!cosmeticId) {
     return (
-      <View
-        style={styles.container}
-        importantForAccessibility={
-          screenReaderEnabled ? 'auto' : 'no-hide-descendants'
-        }
-      >
+      <View style={styles.container} importantForAccessibility="auto">
         <Text style={styles.title} accessibilityRole="header">
           인식 결과
         </Text>
 
-        <Text style={styles.desc}>
-          내 파우치에 해당 화장품 정보가 없습니다.{'\n'}
-          다시 시도해주세요.
-        </Text>
+        <Text style={styles.desc}>화장품 정보를 불러올 수 없습니다.</Text>
 
         <TouchableOpacity
           style={styles.secondaryButton}
@@ -204,7 +179,7 @@ export default function CosmeticDetectResultScreen() {
 
   if (loading) {
     return (
-      <View style={styles.center}>
+      <View style={[styles.container, styles.center]}>
         <ActivityIndicator size="large" color={colors.primary} />
         <Text style={{ color: colors.primary, marginTop: 12 }}>
           인식 결과 불러오는 중...
@@ -215,7 +190,7 @@ export default function CosmeticDetectResultScreen() {
 
   if (!cosmetic) {
     return (
-      <View style={styles.container}>
+      <View style={styles.container} importantForAccessibility="auto">
         <Text style={styles.title} accessibilityRole="header">
           인식 결과
         </Text>
@@ -237,32 +212,39 @@ export default function CosmeticDetectResultScreen() {
   const displayName = cosmetic.cosmeticName || cosmetic.name;
 
   return (
-    <View style={styles.container}>
+    <View
+      style={styles.container}
+      importantForAccessibility={
+        screenReaderEnabled ? 'auto' : 'no-hide-descendants'
+      }
+    >
       <Text style={styles.title} accessibilityRole="header">
         인식 결과
       </Text>
 
+      <View
+        style={styles.imageWrap}
+        accessibilityRole="image"
+        accessibilityLabel={`화장품 인식 결과 이미지. 인식된 화장품은 ${displayName} 입니다.`}
+      >
+        <Image
+          source={require('../assets/detectResult.png')}
+          style={styles.image}
+          resizeMode="contain"
+        />
+      </View>
+
       <Text style={styles.desc}>
         이 화장품은{'\n'}
-        <Text style={{ fontWeight: '800' }}>{displayName}</Text>
-        입니다.
+        <Text style={styles.name}>{displayName}</Text>
+        {'\n'}입니다.
       </Text>
 
-      <TouchableOpacity
-        style={styles.primaryButton}
-        onPress={exitToMyPouch}
-        accessibilityRole="button"
-        accessibilityLabel="화장품 정보 보기"
-      >
+      <TouchableOpacity style={styles.primaryButton} onPress={exitToMyPouch}>
         <Text style={styles.primaryText}>화장품 정보 보기</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity
-        style={styles.secondaryButton}
-        onPress={exitToMain}
-        accessibilityRole="button"
-        accessibilityLabel="홈으로 돌아가기"
-      >
+      <TouchableOpacity style={styles.secondaryButton} onPress={exitToMain}>
         <Text style={styles.secondaryText}>홈으로 돌아가기</Text>
       </TouchableOpacity>
     </View>
@@ -279,8 +261,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   center: {
-    flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
   },
   title: {
@@ -288,19 +268,32 @@ const styles = StyleSheet.create({
     fontSize: 26,
     fontWeight: '800',
     marginBottom: 20,
+    textAlign: 'center',
+  },
+  imageWrap: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  image: {
+    width: 220,
+    height: 220,
   },
   desc: {
     color: colors.primary,
     fontSize: 16,
     lineHeight: 22,
     marginBottom: 40,
+    textAlign: 'center',
+  },
+  name: {
+    fontWeight: '800',
+    fontSize: 18,
   },
   primaryButton: {
     backgroundColor: colors.primary,
     paddingVertical: 16,
     borderRadius: 14,
     alignItems: 'center',
-    justifyContent: 'center',
     marginBottom: 14,
   },
   primaryText: {
@@ -310,15 +303,13 @@ const styles = StyleSheet.create({
   },
   secondaryButton: {
     backgroundColor: colors.primary,
-    borderWidth: 2,
-    borderColor: colors.primary,
-    paddingVertical: 14,
+    paddingVertical: 16,
     borderRadius: 14,
     alignItems: 'center',
   },
   secondaryText: {
     color: '#000',
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
   },
 });

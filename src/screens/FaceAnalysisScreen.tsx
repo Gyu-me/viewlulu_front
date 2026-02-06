@@ -34,13 +34,14 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
+  Pressable,
   Dimensions,
   NativeModules,
   AppState,
   AppStateStatus,
   Linking,
   Platform,
+  TouchableOpacity,
 } from 'react-native';
 import {
   Camera,
@@ -60,6 +61,8 @@ import type { FeatureStackParamList } from '../navigation/FeatureStackNavigator'
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { announceScreen, stopTts } from '../voice/tts';
+import Tts from 'react-native-tts';
+import RNFS from 'react-native-fs';
 
 /* =========================================================
  * Navigation
@@ -174,8 +177,7 @@ function judgeFaceGuidance(
   if (!faces || faces.length === 0) {
     return {
       status: 'NO_FACE',
-      message:
-        '얼굴이 아직 인식되지 않았어요. 핸드폰을 얼굴 정면에 두고, 조금 더 가까이 와주세요.',
+      message: '카메라를 얼굴 쪽으로 향해주세요.',
       debug: { reason: 'faces.length === 0' },
     };
   }
@@ -184,8 +186,7 @@ function judgeFaceGuidance(
   if (!best) {
     return {
       status: 'NO_FACE',
-      message:
-        '얼굴이 아직 인식되지 않았어요. 핸드폰을 얼굴 정면에 두고, 조금 더 가까이 와주세요.',
+      message: '카메라를 얼굴 쪽으로 향해주세요.',
       debug: { reason: 'best === null' },
     };
   }
@@ -239,8 +240,8 @@ function judgeFaceGuidance(
 
     // 방향 → 행동 문구 매핑
     const directionActionMap: Record<string, string> = {
-      왼쪽으로: '핸드폰을 왼쪽으로 조금 이동해주세요.',
-      오른쪽으로: '핸드폰을 오른쪽으로 조금 이동해주세요.',
+      왼쪽으로: '핸드폰을 오른쪽으로 조금 이동해주세요.',
+      오른쪽으로: '핸드폰을 왼쪽으로 조금 이동해주세요.',
       위로: '핸드폰을 위로 조금 들어주세요.',
       아래로: '핸드폰을 아래로 조금 내려주세요.',
     };
@@ -248,9 +249,9 @@ function judgeFaceGuidance(
     // 정서 프리픽스 (시각장애인 안정감 핵심)
     let prefix = '조금만 조정하면 돼요.';
 
-    if (insideRatio < config.INSIDE_OK_RATIO * 0.6) {
+    if (insideRatio < config.INSIDE_OK_RATIO * 0.45) {
       prefix = '아직 카메라가 많이 벗어났어요.';
-    } else if (insideRatio < config.INSIDE_OK_RATIO * 0.85) {
+    } else if (insideRatio < config.INSIDE_OK_RATIO * 0.6) {
       prefix = '거의 맞았어요.';
     }
 
@@ -311,6 +312,7 @@ export default function FaceAnalysisScreen() {
    * Hooks: MUST be declared unconditionally at top
    * ----------------------------------------------------- */
 
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const introTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isIntroSpeakingRef = useRef(false);
 
@@ -369,7 +371,7 @@ export default function FaceAnalysisScreen() {
   // Judgement config
   const judgeConfig = useMemo(
     () => ({
-      INSIDE_OK_RATIO: 0.72,
+      INSIDE_OK_RATIO: 0.6,
       TH_RATIO: 0.03, // 3%
       TOO_FAR_AREA_RATIO: 0.06,
       TOO_CLOSE_AREA_RATIO: 0.38,
@@ -459,6 +461,12 @@ export default function FaceAnalysisScreen() {
           introTimerRef.current = null;
         }
 
+        // 🔥 추가: 롱프레스 타이머 정리
+        if (longPressTimerRef.current) {
+          clearTimeout(longPressTimerRef.current);
+          longPressTimerRef.current = null;
+        }
+
         introDoneRef.current = false;
         lastStatusRef.current = '';
         lastSpeakAtRef.current = 0;
@@ -468,6 +476,16 @@ export default function FaceAnalysisScreen() {
         okStreakRef.current = 0;
         failStreakRef.current = 0;
         setDebugText('');
+      };
+    }, []),
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      Tts.setDefaultRate(1.1, true); // 🔊 얼굴 분석 화면 진입 시 (빠르게)
+
+      return () => {
+        Tts.setDefaultRate(0.8, true); // 🔉 화면 나갈 때 원래 속도로
       };
     }, []),
   );
@@ -652,8 +670,19 @@ export default function FaceAnalysisScreen() {
         skipMetadata: false,
       });
 
-      const path = normalizePhotoPath(photo.path);
-      const result = await FaceDetector.detectFaces(path);
+      const originalPath = normalizePhotoPath(photo.path);
+
+      // 🔥 ML Kit 호환용 임시 JPEG 경로
+      const tmpPath = `${RNFS.CachesDirectoryPath}/face_detect.jpg`;
+
+      // VisionCamera 결과를 "일반 JPEG"로 재저장
+      await RNFS.copyFile(originalPath, tmpPath);
+
+      // 🔥 이 경로로 ML Kit 호출
+      const result = await FaceDetector.detectFaces(tmpPath);
+
+      console.log('[FACE DETECT RESULT]', result);
+      console.log('[PHOTO PATH]', tmpPath);
 
       const frameRectN = getFrameRectN();
       const raw = judgeFaceGuidance(result, frameRectN, judgeConfig);
@@ -748,6 +777,37 @@ export default function FaceAnalysisScreen() {
   }, [navigation]);
 
   /* -------------------------------------------------------
+   * Long press to capture
+   * ----------------------------------------------------- */
+
+  const LONG_PRESS_MS = 800;
+
+  const startLongPress = () => {
+    if (
+      isIntroSpeakingRef.current || // 인트로 중
+      !introDoneRef.current || // 인트로 미완료
+      isCheckingRef.current || // 얼굴 판정 중
+      isCapturingRef.current || // 이미 촬영 중
+      !cameraRef.current ||
+      longPressTimerRef.current // 이미 타이머 있음
+    ) {
+      return;
+    }
+
+    longPressTimerRef.current = setTimeout(() => {
+      longPressTimerRef.current = null;
+      handleCapture();
+    }, LONG_PRESS_MS);
+  };
+
+  const cancelLongPress = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  /* -------------------------------------------------------
    * Permission UI helpers
    * ----------------------------------------------------- */
 
@@ -817,7 +877,10 @@ export default function FaceAnalysisScreen() {
       <View style={[styles.textArea, { paddingTop: insets.top + 30 }]}>
         <Text style={styles.title}>얼굴형 분석</Text>
 
-        <Text style={styles.hint}>음성 안내에 따라 얼굴을 맞춰주세요.</Text>
+        <Text style={styles.hint}>
+          음성 안내에 따라 얼굴을 맞춘 뒤 {'\n'}
+          화면을 1초 정도 꾹 눌러 촬영하세요.
+        </Text>
 
         {!!debugText && <Text style={styles.debug}>{debugText}</Text>}
       </View>
@@ -827,6 +890,7 @@ export default function FaceAnalysisScreen() {
         width={screenWidth}
         height={screenHeight}
         style={StyleSheet.absoluteFill}
+        pointerEvents="none"
       >
         <Defs>
           <Mask id="mask">
@@ -863,12 +927,15 @@ export default function FaceAnalysisScreen() {
             left: (screenWidth - FRAME_WIDTH) / 2,
           },
         ]}
+        pointerEvents="none"
       />
 
-      {/* Capture Button */}
-      <TouchableOpacity style={styles.captureButton} onPress={handleCapture}>
-        <Text style={styles.captureText}>촬영하기</Text>
-      </TouchableOpacity>
+      {/* 🔥 전체 화면 롱프레스 레이어 */}
+      <Pressable
+        style={StyleSheet.absoluteFill}
+        onPressIn={startLongPress}
+        onPressOut={cancelLongPress}
+      />
     </View>
   );
 }
@@ -957,21 +1024,5 @@ const styles = StyleSheet.create({
     position: 'absolute',
     borderWidth: 4,
     borderColor: '#FFD400',
-  },
-
-  captureButton: {
-    position: 'absolute',
-    bottom: 100,
-    alignSelf: 'center',
-    backgroundColor: '#FFD400',
-    paddingVertical: 18,
-    paddingHorizontal: 80,
-    borderRadius: 36,
-  },
-
-  captureText: {
-    color: '#000',
-    fontSize: 20,
-    fontWeight: 'bold',
   },
 });

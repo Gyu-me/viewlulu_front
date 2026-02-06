@@ -23,12 +23,21 @@ android {
         applicationId "com.viewluluapp"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 2
-        versionName "1.0.1"
+        versionCode 8
+        versionName "2.0.0"
 
         manifestPlaceholders = [
                 usesCleartextTraffic: "true"
         ]
+
+        /**
+         * 🔥 16KB 메모리 페이지 크기 대응
+         * - x86 / x86_64 ABI 제거
+         * - ARM64 실기기 전용 빌드
+         */
+        ndk {
+            abiFilters "arm64-v8a", "armeabi-v7a"
+        }
     }
 
     /**
@@ -87,13 +96,26 @@ android {
             ]
         }
     }
+
+
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+
+            // 🔥 Play Console 16KB 오류의 직접 원인 제거
+            excludes += [
+                    "**/x86/**",
+                    "**/x86_64/**"
+            ]
+        }
+    }
 }
 
 dependencies {
     implementation("com.facebook.react:react-android")
 
     // 얼굴형 분석
-    implementation 'org.tensorflow:tensorflow-lite:2.13.0'
+    implementation 'org.tensorflow:tensorflow-lite:2.15.0'
     implementation 'com.google.mlkit:face-detection:16.1.6'
 
     if (hermesEnabled.toBoolean()) {

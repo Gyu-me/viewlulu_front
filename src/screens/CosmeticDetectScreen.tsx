@@ -1,10 +1,23 @@
 /**
- * CosmeticDetectScreen.tsx
+ * CosmeticDetectScreen (DEPLOY STABLE FINAL)
  * --------------------------------------------------
- * - 화장품 인식 카메라 화면
- * - 버튼 촬영 + Whisper STT(“찰칵/김치/치즈/사진/브이”) 자동 촬영
- * - TalkBack(스크린리더) ON 환경에서도 안정 동작
- * - 중복 캡처 / Alert 중첩 / stale state 문제 완전 차단
+ *
+ * ✅ 배포 안정화(추가된 방어 로직)
+ *   1) 카메라 세션 충돌 완화:
+ *      - takePhoto 직후 isActive(false) + 짧은 딜레이
+ *      - Alert가 떠 있는 동안 카메라를 재활성화하지 않음
+ *   2) 중복 캡처/중복 Alert 방지:
+ *      - loading 가드 + alertOpenRef 가드
+ *   3) 언마운트 이후 setState 방지:
+ *      - mountedRef로 안전하게 상태 업데이트
+ *   4) 실패/예외 시에도 loading 해제 보장:
+ *      - finally에서 로딩 해제 + 카메라 재활성화 조건부 처리
+ *   5) ImageResizer 임시파일 정리(가능할 때):
+ *      - createResizedImage 결과의 path/uri를 이용해 best-effort cleanup
+ *
+ * ✅ FIXED
+ *   - 결과 화면으로 네비게이션되는 순간 카메라 재활성화 차단
+ *   - session/invalid-output-configuration 에러 제거
  */
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
@@ -33,59 +46,36 @@ import ImageResizer from 'react-native-image-resizer';
 
 import { colors } from '../theme/colors';
 import { detectCosmeticApi } from '../api/cosmeticDetect.api';
-import {
-  startWhisperRecording,
-  stopWhisperRecording,
-} from '../voice/whisperRecorder';
-import { requestMicPermission } from '../voice/requestMicPermission';
+
+/* ================= Component ================= */
 
 export default function CosmeticDetectScreen() {
-  /* ================= Navigation / Layout ================= */
-
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const insets = useSafeAreaInsets();
-
-  /* ================= Camera ================= */
 
   const cameraRef = useRef<Camera>(null);
   const device = useCameraDevice('back');
   const { hasPermission, requestPermission } = useCameraPermission();
 
-  const [isActive, setIsActive] = useState(false);
-  const [cameraReady, setCameraReady] = useState(false);
   const [loading, setLoading] = useState(false);
-
-  /* ================= Stable Refs ================= */
+  const [isActive, setIsActive] = useState(false);
 
   const mountedRef = useRef(true);
   const alertOpenRef = useRef(false);
   const navigatedRef = useRef(false);
-  const capturingRef = useRef(false);
-  const whisperLoopRef = useRef(false);
+  const appStateRef = useRef<AppStateStatus>(AppState.currentState);
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const isActiveRef = useRef(false);
-  const cameraReadyRef = useRef(false);
-  const loadingRef = useRef(false);
-
-  useEffect(() => {
-    isActiveRef.current = isActive;
-  }, [isActive]);
-  useEffect(() => {
-    cameraReadyRef.current = cameraReady;
-  }, [cameraReady]);
-  useEffect(() => {
-    loadingRef.current = loading;
-  }, [loading]);
-
-  /* ================= Mount / Unmount ================= */
+  /* ================= Mount ================= */
 
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      whisperLoopRef.current = false;
-      stopWhisperRecording();
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+      }
     };
   }, []);
 
@@ -95,15 +85,39 @@ export default function CosmeticDetectScreen() {
     if (!hasPermission) requestPermission();
   }, [hasPermission, requestPermission]);
 
-  /* ================= Reset ================= */
+  /* ================= AppState ================= */
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', nextState => {
+      appStateRef.current = nextState;
+      if (nextState !== 'active' && mountedRef.current) {
+        setIsActive(false);
+      }
+    });
+
+    return () => sub.remove();
+  }, []);
+
+  /* ================= Focus ================= */
+
+  useFocusEffect(
+    useCallback(() => {
+      if (mountedRef.current && !loading && !alertOpenRef.current) {
+        setIsActive(true);
+      }
+      return () => {
+        if (mountedRef.current) setIsActive(false);
+      };
+    }, []),
+  );
+
+  /* ================= RESET ================= */
 
   useEffect(() => {
     if (route.params?.reset) {
       navigatedRef.current = false;
       alertOpenRef.current = false;
-      capturingRef.current = false;
       setLoading(false);
-      setCameraReady(false);
       setIsActive(true);
       navigation.setParams({ reset: false });
     }
@@ -111,29 +125,21 @@ export default function CosmeticDetectScreen() {
 
   /* ================= Capture ================= */
 
-  const handleCapture = useCallback(async () => {
-    if (
-      loadingRef.current ||
-      capturingRef.current ||
-      !cameraRef.current ||
-      !device ||
-      !isActiveRef.current ||
-      !cameraReadyRef.current ||
-      alertOpenRef.current ||
-      navigatedRef.current
-    ) {
+  const handleCapture = async () => {
+    if (loading || !cameraRef.current || !device || alertOpenRef.current) {
       return;
     }
 
-    capturingRef.current = true;
-    whisperLoopRef.current = false;
     setLoading(true);
 
     try {
-      const photo = await cameraRef.current.takePhoto({ flash: 'off' });
+      const photo = await cameraRef.current.takePhoto({
+        flash: 'off',
+        enableShutterSound: true,
+      });
 
       setIsActive(false);
-      await new Promise(r => setTimeout(r, 250));
+      await new Promise(r => setTimeout(r, 300));
 
       const resized = await ImageResizer.createResizedImage(
         `file://${photo.path}`,
@@ -156,136 +162,62 @@ export default function CosmeticDetectScreen() {
         score: result.score,
         fromDetect: true,
       });
-    } catch (e) {
+    } catch (e: any) {
+      if (alertOpenRef.current) return; // ✅ 중복 Alert 방지
+
       alertOpenRef.current = true;
+
       Alert.alert(
         '인식 실패',
         '인식에 실패하였습니다. 다시 촬영해주세요.',
         [
           {
             text: '확인',
-            onPress: async () => {
+            onPress: () => {
               alertOpenRef.current = false;
-              capturingRef.current = false;
-              setLoading(false);
 
-              // 1️⃣ Camera 먼저 끈다
-              setIsActive(false);
-              setCameraReady(false);
-
-              // 2️⃣ Camera OFF 상태에서 Whisper 시작
-              const started = await startWhisperRecording();
-              if (started) {
-                startWhisperLoop();
+              // ✅ 여기서만 재활성화 허용 (네비게이션 안 된 상태에서만)
+              if (mountedRef.current && !navigatedRef.current) {
+                setIsActive(true);
               }
-
-              // 3️⃣ Whisper가 안정화된 뒤 Camera 다시 켠다
-              await new Promise(r => setTimeout(r, 300));
-              setIsActive(true);
             },
           },
         ],
         { cancelable: false },
       );
-    }
-  }, [device, navigation]);
-
-  /* ================= Whisper Loop (FIXED) ================= */
-
-  /* ================= Whisper Loop (FINAL STABLE) ================= */
-
-  const startWhisperLoop = useCallback(async () => {
-    if (whisperLoopRef.current) return;
-    whisperLoopRef.current = true;
-
-    try {
-      while (
-        mountedRef.current &&
-        isActiveRef.current &&
-        !navigatedRef.current &&
-        !capturingRef.current
-      ) {
-        // 1️⃣ 녹음 시작
-        const started = await startWhisperRecording();
-        if (!started) {
-          await new Promise(r => setTimeout(r, 800));
-          continue;
-        }
-
-        // 2️⃣ 사용자가 말할 시간 (중요)
-        await new Promise(r => setTimeout(r, 5000));
-
-        // 3️⃣ 녹음 종료 + STT
-        const result = await stopWhisperRecording();
-
-        const text = (result?.text || '').trim();
-
-        // 🔥 로그는 최소화 (폭주 방지)
-        if (__DEV__ && text) {
-          console.log('[WHISPER TEXT]', text);
-        }
-
-        // 4️⃣ 너무 짧거나 빈 인식은 무시
-        if (text.length < 2) {
-          await new Promise(r => setTimeout(r, 800));
-          continue;
-        }
-
-        // 5️⃣ 현실적인 판정 (contains_chalkak ❌)
-        const hit =
-          text.includes('찰') ||
-          text.includes('칵') ||
-          text.includes('치즈') ||
-          text.includes('김치') ||
-          text.includes('사진') ||
-          text.includes('브이');
-
-        if (hit) {
-          handleCapture();
-          break;
-        }
-
-        // 6️⃣ 다음 루프 전 쿨다운
-        await new Promise(r => setTimeout(r, 1000));
-      }
     } finally {
-      // 🔥 어떤 경우에도 루프 상태 복구
-      whisperLoopRef.current = false;
+      setLoading(false);
+      // ❗ 여기서는 재활성화하지 않음 (Alert onPress에서만 / reset 흐름에서만)
     }
-  }, [handleCapture]);
+  };
 
-  /* ================= Focus ================= */
+  /* ================= Long Press ================= */
 
-  useFocusEffect(
-    useCallback(() => {
-      let cancelled = false;
+  const LONG_PRESS_MS = 800;
 
-      // 🔥 Focus 진입 = Camera만 활성화
-      setCameraReady(false);
-      setIsActive(true);
+  const startLongPress = () => {
+    if (
+      loading ||
+      alertOpenRef.current ||
+      !isActive ||
+      !cameraRef.current ||
+      longPressTimerRef.current // ✅ 이미 타이머 있으면 무시
+    ) {
+      return;
+    }
 
-      setTimeout(async () => {
-        if (cancelled) return;
+    longPressTimerRef.current = setTimeout(() => {
+      longPressTimerRef.current = null; // ✅ 트리거 직전 정리
+      handleCapture();
+    }, LONG_PRESS_MS);
+  };
 
-        try {
-          await requestMicPermission();
-        } catch (e) {
-          console.warn('[MicPermission] skipped (activity not ready)');
-        }
-      }, 0);
-
-      return () => {
-        cancelled = true;
-
-        // 🔥 Focus 해제 시 모든 Whisper 정리
-        whisperLoopRef.current = false;
-        capturingRef.current = false;
-
-        setIsActive(false); // Camera OFF
-        stopWhisperRecording(); // 혹시 남아있을 수 있는 녹음 정리
-      };
-    }, []),
-  );
+  const cancelLongPress = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
 
   /* ================= Render ================= */
 
@@ -316,35 +248,31 @@ export default function CosmeticDetectScreen() {
         device={device}
         isActive={isActive}
         photo
-        onInitialized={() => {
-          setCameraReady(true);
-          startWhisperLoop(); // 🔥 카메라 준비 후 STT 시작
-        }}
       />
 
-      <View
-        style={[styles.topOverlay, { paddingTop: insets.top + 24 }]}
-        accessibilityRole="header"
-      >
+      {/* 🔥 전체 화면 롱프레스 레이어 */}
+      <Pressable
+        style={StyleSheet.absoluteFill}
+        onPressIn={startLongPress}
+        onPressOut={cancelLongPress}
+        disabled={loading}
+      />
+
+      {/* 🔥 SafeArea 상단 제목 */}
+      <View style={[styles.topOverlay, { paddingTop: insets.top + 24 }]}>
         <Text style={styles.title}>화장품 인식</Text>
         <Text style={styles.sub}>
-          카메라로 화장품을 비추면 어떤 제품인지 알려드려요
+          카메라로 화장품을 비추고 화면을 1초 정도 꾹 누르면 내 파우치 안에 어떤
+          제품인지 알려드려요
         </Text>
       </View>
 
-      <View style={styles.overlay}>
-        <Pressable
-          style={styles.captureButton}
-          onPress={handleCapture}
-          disabled={loading}
-          accessibilityRole="button"
-          accessibilityLabel="촬영하기"
-        >
-          <Text style={styles.captureText}>
-            {loading ? '인식 중...' : '촬영하기'}
-          </Text>
-        </Pressable>
-      </View>
+      {loading && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>인식 중…</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -359,7 +287,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  text: { color: '#fff' },
+  text: { color: '#fff', fontSize: 15 },
   primaryBtn: {
     marginTop: 16,
     backgroundColor: colors.primary,
@@ -369,6 +297,7 @@ const styles = StyleSheet.create({
   },
   primaryText: { color: '#000', fontWeight: '700' },
 
+  /* 🔥 상단 SafeArea 제목 */
   topOverlay: {
     position: 'absolute',
     top: 0,
@@ -383,19 +312,19 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginBottom: 6,
   },
-  sub: { color: '#fff', fontSize: 14 },
-
-  overlay: {
-    position: 'absolute',
-    bottom: 100,
-    width: '100%',
+  sub: {
+    color: '#fff',
+    fontSize: 14,
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  captureButton: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: 40,
-    paddingVertical: 16,
-    borderRadius: 30,
+  loadingText: {
+    marginTop: 12,
+    color: '#fff',
+    fontSize: 15,
   },
-  captureText: { color: '#000', fontWeight: '700', fontSize: 16 },
 });

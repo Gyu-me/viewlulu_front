@@ -31,9 +31,6 @@ import { ImageBackground } from 'react-native';
 import { colors } from '../theme/colors';
 import { getMyCosmeticsApi } from '../api/cosmetic.api';
 import type { RootStackParamList } from '../navigation/RootNavigator';
-import { startListening, stopListening } from '../voice/voiceListener';
-import { routeVoiceCommand } from '../voice/voiceCommandRouter';
-import { requestMicPermission } from '../voice/requestMicPermission';
 import { ScrollView } from 'react-native';
 
 import PackageIcon from '../assets/packageicon.png';

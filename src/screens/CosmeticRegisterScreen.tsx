@@ -17,7 +17,7 @@
  */
 
 import React, { useRef, useState, useCallback, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, Image, Pressable } from 'react-native';
 import {
   Camera,
   useCameraDevice,
@@ -35,10 +35,22 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 const MAX_PHOTOS = 4;
 
 const CAPTURE_GUIDE = [
-  { title: '정면 촬영', desc: '화장품의 정면이 보이도록 촬영해주세요' },
-  { title: '후면 촬영', desc: '화장품의 뒷면이 보이도록 촬영해주세요' },
-  { title: '상단 촬영', desc: '화장품의 위쪽이 보이도록 촬영해주세요' },
-  { title: '하단 촬영', desc: '화장품의 바닥이 잘 보이도록 촬영해주세요' },
+  {
+    title: '정면 촬영',
+    desc: '화장품의 정면이 보이도록 촬영해주세요 \n화면을 1초 정도 꾹 눌러 촬영하세요.',
+  },
+  {
+    title: '후면 촬영',
+    desc: '화장품의 뒷면이 보이도록 촬영해주세요 \n화면을 1초 정도 꾹 눌러 촬영하세요.',
+  },
+  {
+    title: '상단 촬영',
+    desc: '화장품의 위쪽이 보이도록 촬영해주세요 \n화면을 1초 정도 꾹 눌러 촬영하세요.',
+  },
+  {
+    title: '하단 촬영',
+    desc: '화장품의 바닥이 잘 보이도록 촬영해주세요 \n화면을 1초 정도 꾹 눌러 촬영하세요.',
+  },
 ];
 
 export default function CosmeticRegisterScreen() {
@@ -56,6 +68,8 @@ export default function CosmeticRegisterScreen() {
   // 내부 제어용 ref
   const isNavigatingRef = useRef(false);
   const isCapturingRef = useRef(false);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const LONG_PRESS_MS = 800;
 
   /* ================= Permission ================= */
 
@@ -84,6 +98,11 @@ export default function CosmeticRegisterScreen() {
         parent?.setOptions({
           tabBarStyle: undefined,
         });
+
+        if (longPressTimerRef.current) {
+          clearTimeout(longPressTimerRef.current);
+          longPressTimerRef.current = null;
+        }
       };
     }, [navigation]),
   );
@@ -177,7 +196,10 @@ export default function CosmeticRegisterScreen() {
     isCapturingRef.current = true;
 
     try {
-      const photo = await cameraRef.current.takePhoto();
+      const photo = await cameraRef.current.takePhoto({
+        flash: 'off',
+        enableShutterSound: true,
+      });
       const uri = `file://${photo.path}`;
 
       if (currentIndex + 1 === MAX_PHOTOS) {
@@ -198,18 +220,39 @@ export default function CosmeticRegisterScreen() {
     }
   };
 
+  const startLongPress = () => {
+    if (
+      !isActive ||
+      isCapturingRef.current ||
+      isNavigatingRef.current ||
+      currentIndex >= MAX_PHOTOS ||
+      longPressTimerRef.current
+    ) {
+      return;
+    }
+
+    longPressTimerRef.current = setTimeout(() => {
+      longPressTimerRef.current = null;
+      handleCapture();
+    }, LONG_PRESS_MS);
+  };
+
+  const cancelLongPress = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
   /* ================= Render ================= */
 
   if (!hasPermission) {
     return (
       <View style={styles.center}>
         <Text style={styles.permissionText}>카메라 권한이 필요합니다.</Text>
-        <TouchableOpacity
-          style={styles.permissionBtn}
-          onPress={requestPermission}
-        >
+        <Pressable style={styles.permissionBtn} onPress={requestPermission}>
           <Text style={styles.permissionBtnText}>권한 허용</Text>
-        </TouchableOpacity>
+        </Pressable>
       </View>
     );
   }
@@ -257,9 +300,12 @@ export default function CosmeticRegisterScreen() {
         </View>
       )}
 
-      <TouchableOpacity style={styles.captureButton} onPress={handleCapture}>
-        <Text style={styles.captureText}>촬영하기</Text>
-      </TouchableOpacity>
+      {/* 🔥 전체 화면 롱프레스 촬영 */}
+      <Pressable
+        style={StyleSheet.absoluteFill}
+        onPressIn={startLongPress}
+        onPressOut={cancelLongPress}
+      />
     </View>
   );
 }

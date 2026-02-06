@@ -93,11 +93,15 @@ function MainTabs() {
         component={MyPouchStackNavigator}
         options={({ route }) => {
           const routeName = getFocusedRouteNameFromRoute(route) ?? 'MyPouch';
-
           const hideTabBar = routeName === 'CosmeticDetail';
 
           return {
             popToTopOnBlur: true,
+
+            tabBarLabel: '내 파우치',
+
+            tabBarAccessibilityLabel: '내 파우치 탭',
+
             tabBarStyle: hideTabBar
               ? { ...BASE_TAB_STYLE, display: 'none' }
               : {
@@ -105,6 +109,7 @@ function MainTabs() {
                   paddingBottom: BASE_TAB_STYLE.paddingBottom + insets.bottom,
                   height: BASE_TAB_STYLE.height + insets.bottom,
                 },
+
             tabBarIcon: ({ focused }) => (
               <Image
                 source={PouchIcon}
@@ -123,6 +128,9 @@ function MainTabs() {
         name="HomeTab"
         component={HomeStackNavigator}
         options={{
+          tabBarLabel: '홈',
+          tabBarAccessibilityLabel: '홈 탭',
+
           tabBarIcon: ({ focused }) => (
             <Image
               source={HomeIcon}
@@ -140,6 +148,9 @@ function MainTabs() {
         name="SettingsTab"
         component={SettingsStackNavigator}
         options={{
+          tabBarLabel: '설정',
+          tabBarAccessibilityLabel: '설정 탭',
+
           tabBarIcon: ({ focused }) => (
             <Image
               source={SettingsIcon}

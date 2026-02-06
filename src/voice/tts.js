@@ -3,7 +3,6 @@ import { AppState } from 'react-native';
 
 let ttsReady = false;
 let isAppActive = true; // 🔥 핵심 플래그
-let currentRate = 0.45;
 
 /**
  * 앱 시작 시 한 번 호출
@@ -29,9 +28,14 @@ export async function initTTS() {
 }
 
 /** 🔥 추가: 음성 속도 변경 */
-export function setTtsRate(rate) {
-  currentRate = rate;
-  Tts.setDefaultRate(rate, true);
+export function initTts() {
+  Tts.setDefaultLanguage('ko-KR');
+
+  // 🔥 속도 조절 (추천)
+  Tts.setDefaultRate(0.88, true);
+
+  // 선택: 음높이
+  Tts.setDefaultPitch(1.0);
 }
 
 /**

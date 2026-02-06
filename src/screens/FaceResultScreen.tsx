@@ -151,24 +151,6 @@ export default function FaceResultScreen() {
     );
   };
 
-  /** 저장 */
-  const handleSave = async () => {
-    try {
-      const payload = {
-        analyzedAt: new Date().toISOString(),
-        results: results.map(r => ({
-          label: r.label,
-          percent: r.percent,
-        })),
-      };
-
-      await saveFaceAnalysisResultApi(payload);
-      goHome();
-    } catch (e) {
-      console.log('[FaceResult] save error', e);
-    }
-  };
-
   return (
     <ScrollView
       style={styles.container}
@@ -197,12 +179,6 @@ export default function FaceResultScreen() {
       ))}
 
       <View style={styles.buttonArea}>
-        {!isReadOnly && (
-          <TouchableOpacity style={styles.primaryButton} onPress={handleSave}>
-            <Text style={styles.primaryText}>결과 저장하기</Text>
-          </TouchableOpacity>
-        )}
-
         <TouchableOpacity style={styles.secondaryButton} onPress={goHome}>
           <Text style={styles.secondaryText}>홈으로 돌아가기</Text>
         </TouchableOpacity>

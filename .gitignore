@@ -2,6 +2,13 @@
 #
 .DS_Store
 *.zip
+
+# Environment variables
+.env
+.env.*
+
+
+
 # Xcode
 #
 build/
